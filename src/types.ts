@@ -290,6 +290,25 @@ export interface StabilityReport {
   findings: Finding[];
 }
 
+export interface ChainStep {
+  fromTurn: number;
+  toTurn: number;
+  holds: boolean;
+  sharedTokens: number;
+  toTurnTokens: number;
+}
+
+export interface ChainReport {
+  reportVersion: 1;
+  ok: boolean;
+  certain: boolean;
+  provider: ProviderId;
+  model: string;
+  turns: number;
+  steps: ChainStep[];
+  findings: Finding[];
+}
+
 export interface Report {
   reportVersion: 1;
   /** No finding of severity 'fail'. */
