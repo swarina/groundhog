@@ -114,6 +114,28 @@ export const CATALOGUE: Record<string, CatalogueEntry> = {
     ],
   },
 
+  GH140: {
+    code: 'GH140',
+    title: 'The cached prefix changed since the baseline',
+    what:
+      'The cacheable prefix hashes to a different value than the one committed in the baseline lockfile. The prompt, ' +
+      'the tool definitions, or the way they are assembled changed since the baseline was recorded.',
+    why:
+      'A change to the cached prefix invalidates every cached entry for it across the fleet on the next deploy. The ' +
+      'cache cold starts, and it costs the full uncached rate on every request until it refills. This is expected when ' +
+      'the prompt was edited on purpose, and it is a surprise when it was not, which is what committing the hash makes ' +
+      'visible in review.',
+    fix:
+      'If the change was intended, update the baseline to accept it. If it was not, find what moved: a template edit, a ' +
+      'reordered tool list, or a value that drifted into the cached prefix. Run "groundhog blame" to see which commit ' +
+      'changed it.',
+    detects: [
+      'a system prompt edited without expecting the cache to reset',
+      'a dependency bump that changed how tools serialise',
+      'a value that drifted above the cache boundary between releases',
+    ],
+  },
+
   GH130: {
     code: 'GH130',
     title: 'The conversation stops reusing its prefix',

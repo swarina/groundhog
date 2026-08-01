@@ -6,6 +6,16 @@ import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
 import { checkCapturedStability } from '../engine/stability.js';
 import { checkChain } from '../engine/chain.js';
 import { auditLog } from '../engine/audit.js';
+import {
+  compareEntry,
+  computePrefix,
+  readLockfile,
+  upsertEntry,
+  writeLockfile,
+  DEFAULT_LOCKFILE,
+  type BaselineEntry,
+} from '../baseline/lockfile.js';
+import { blame, NotAGitRepoError } from '../baseline/blame.js';
 import { adapterFor, detectProvider } from '../providers/adapters/index.js';
 import { loadTable, resolveProfile } from '../providers/table.js';
 import { explain } from '../report/catalogue.js';
@@ -25,6 +35,8 @@ usage
   groundhog check [file]         check a set of requests for a stable prefix
   groundhog chain [file]         check a conversation for prefix reuse per turn
   groundhog audit <log>          decompose cache loss over a log of real requests
+  groundhog baseline <file>      record or check the prefix hash against a lockfile
+  groundhog blame                show which commit changed the cached prefix
   groundhog providers list       list providers in the data table
   groundhog providers show <id> [model]
   groundhog explain <code>       full write-up for a finding code
@@ -80,6 +92,10 @@ function main(argv: string[]): number {
         return runChain(parsed);
       case 'audit':
         return runAudit(parsed);
+      case 'baseline':
+        return runBaseline(parsed);
+      case 'blame':
+        return runBlame(parsed);
       case 'providers':
         return runProviders(parsed);
       case 'explain':
@@ -333,6 +349,125 @@ function runAudit(parsed: ParsedArgs): number {
   } else {
     const widthFlag = stringFlag(parsed.flags, 'width');
     process.stdout.write(renderAudit(results, { color: shouldColor(parsed), width: widthFlag ? Number.parseInt(widthFlag, 10) : 80 }));
+  }
+  return 0;
+}
+
+function runBaseline(parsed: ParsedArgs): number {
+  const file = parsed.positionals[0];
+  if (!file) {
+    process.stderr.write('baseline needs a request file to compute a prefix hash from. Pass a json request body.\n');
+    return 2;
+  }
+  if (!existsSync(file)) {
+    process.stderr.write(`No such file: ${file}\n`);
+    return 2;
+  }
+
+  const lockfilePath = stringFlag(parsed.flags, 'lockfile') ?? DEFAULT_LOCKFILE;
+  const id = stringFlag(parsed.flags, 'name') ?? file;
+  const options = {
+    ...(stringFlag(parsed.flags, 'model') ? { model: stringFlag(parsed.flags, 'model') } : {}),
+    ...(stringFlag(parsed.flags, 'provider') ? { provider: stringFlag(parsed.flags, 'provider') } : {}),
+    ...(stringFlag(parsed.flags, 'provider-table') ? { table: stringFlag(parsed.flags, 'provider-table') } : {}),
+  };
+
+  const requests = readRequests(file);
+  const first = requests[0];
+  if (!first) {
+    process.stderr.write(`${file} held no request.\n`);
+    return 2;
+  }
+  const current = computePrefix(first.body, options);
+  const lockfile = readLockfile(lockfilePath);
+  const stored = lockfile.entries.find((entry) => entry.id === id);
+
+  const isCheck = boolFlag(parsed.flags, 'check');
+
+  if (isCheck) {
+    if (!stored) {
+      process.stderr.write(
+        `No baseline recorded for "${id}" in ${lockfilePath}.\n` +
+          `Record one first: groundhog baseline ${file} --model ${current.model}\n`,
+      );
+      return 2;
+    }
+    const drift = compareEntry(stored, current);
+    if (!drift.changed) {
+      process.stdout.write(`ok  ${id}: the cached prefix matches the baseline (${current.prefixHash.slice(0, 12)})\n`);
+      return 0;
+    }
+    process.stdout.write(
+      `FAIL  GH140  the cached prefix changed since the baseline\n\n` +
+        `  ${id} was recorded at ${stored.recordedAt}.\n` +
+        `  hash    ${drift.before.slice(0, 12)} to ${drift.after.slice(0, 12)}\n` +
+        `  tokens  ${formatCount(drift.tokensBefore)} to ${formatCount(drift.tokensAfter)}\n\n` +
+        `  This invalidates every cached prefix for it on the next deploy, until the cache refills.\n` +
+        `  If the change was intended, accept it: groundhog baseline ${file} --model ${current.model} --update\n` +
+        `  To find the commit that changed it, run: groundhog blame --name "${id}"\n`,
+    );
+    return 1;
+  }
+
+  if (stored && stored.prefixHash === current.prefixHash && !boolFlag(parsed.flags, 'update')) {
+    process.stdout.write(`ok  ${id}: already recorded, unchanged (${current.prefixHash.slice(0, 12)})\n`);
+    return 0;
+  }
+
+  const entry: BaselineEntry = {
+    id,
+    provider: current.provider,
+    model: current.model,
+    prefixHash: current.prefixHash,
+    tokens: current.tokens,
+    // Date is read here rather than in the library, which stays pure.
+    recordedAt: new Date().toISOString(),
+  };
+  writeLockfile(lockfilePath, upsertEntry(lockfile, entry));
+  process.stdout.write(
+    `${stored ? 'updated' : 'recorded'} ${id} in ${lockfilePath}: ${current.prefixHash.slice(0, 12)}, ${formatCount(current.tokens)} tokens.\n` +
+      'Commit the lockfile so a change to the cached prefix shows up in review.\n',
+  );
+  return 0;
+}
+
+function runBlame(parsed: ParsedArgs): number {
+  const lockfilePath = stringFlag(parsed.flags, 'lockfile') ?? DEFAULT_LOCKFILE;
+  if (!existsSync(lockfilePath)) {
+    process.stderr.write(`No baseline lockfile at ${lockfilePath}. Record one with groundhog baseline first.\n`);
+    return 2;
+  }
+
+  const lockfile = readLockfile(lockfilePath);
+  const name = stringFlag(parsed.flags, 'name');
+  const entries = name ? lockfile.entries.filter((entry) => entry.id === name) : lockfile.entries;
+  if (entries.length === 0) {
+    process.stderr.write(name ? `No baseline entry named "${name}".\n` : `The lockfile ${lockfilePath} has no entries.\n`);
+    return 2;
+  }
+
+  try {
+    entries.forEach((entry, index) => {
+      const result = blame(lockfilePath, entry.id, entry.prefixHash);
+      if (index > 0) process.stdout.write('\n');
+      process.stdout.write(`${entry.id}\n`);
+      process.stdout.write(`  current  ${entry.prefixHash.slice(0, 12)}, ${formatCount(entry.tokens)} tokens\n`);
+      if (result.introducedBy) {
+        const when = new Date(result.introducedBy.timestamp * 1000).toISOString().slice(0, 10);
+        process.stdout.write(`  changed  ${result.introducedBy.hash.slice(0, 12)} on ${when}, "${result.introducedBy.subject}"\n`);
+        if (result.previousHash) process.stdout.write(`  from     ${result.previousHash.slice(0, 12)}\n`);
+      } else if (result.touchingCommits === 0) {
+        process.stdout.write('  the lockfile is not committed yet, so there is no history to walk.\n');
+      } else {
+        process.stdout.write('  the current hash has been in place for the whole tracked history.\n');
+      }
+    });
+  } catch (error) {
+    if (error instanceof NotAGitRepoError) {
+      process.stderr.write(`${error.message}\n`);
+      return 2;
+    }
+    throw error;
   }
   return 0;
 }

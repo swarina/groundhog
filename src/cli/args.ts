@@ -11,8 +11,8 @@ export class UsageError extends Error {
   }
 }
 
-const VALUE_FLAGS = new Set(['model', 'provider', 'width', 'provider-table']);
-const BOOLEAN_FLAGS = new Set(['json', 'color', 'no-color', 'strict', 'help', 'version']);
+const VALUE_FLAGS = new Set(['model', 'provider', 'width', 'provider-table', 'name', 'lockfile']);
+const BOOLEAN_FLAGS = new Set(['json', 'color', 'no-color', 'strict', 'help', 'version', 'check', 'update']);
 
 /**
  * Small hand written parser.

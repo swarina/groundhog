@@ -5,6 +5,18 @@ export { auditRecords, auditLog, auditText } from './engine/audit.js';
 export { decompose, type AuditResult, type BucketSummary, type LossBucket, type PrefixSummary } from './audit/decompose.js';
 export { normaliseUsage, parseLog, readLog, LogFormatError } from './audit/ingest.js';
 export { buildAuditRecord, auditRecordLine, type RecordInput } from './audit/record.js';
+export {
+  computePrefix,
+  readLockfile,
+  writeLockfile,
+  upsertEntry,
+  compareEntry,
+  DEFAULT_LOCKFILE,
+  type BaselineEntry,
+  type Lockfile,
+  type DriftResult,
+} from './baseline/lockfile.js';
+export { blame, NotAGitRepoError, type BlameResult, type Commit } from './baseline/blame.js';
 export { renderAudit, renderAuditResult } from './report/audit.js';
 export type { AuditRecord, NormalisedUsage } from './audit/types.js';
 export { checkStablePrefix, expectStablePrefix, PrefixInstabilityError, type StableCheckOptions } from './assert/index.js';
