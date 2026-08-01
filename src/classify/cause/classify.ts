@@ -98,18 +98,37 @@ function detectOrdering(result: MatrixResult): Cause | null {
   if (blockOrder) return blockOrder;
 
   const div = result.divergence;
-  if (div && div.partIndex != null) {
+  if (div) {
     const refBlock = reference.prefix.find((block) => block.index === div.blockIndex);
     const otherBlock = other.prefix.find((block) => block.index === div.blockIndex);
-    const refText = partText(refBlock?.parts[div.partIndex]);
-    const otherText = partText(otherBlock?.parts[div.partIndex]);
-    if (refText != null && otherText != null) {
-      const lines = detectLineReorder(refText, otherText);
-      if (lines) return lines;
+    if (refBlock && otherBlock) {
+      const partOrder = detectPartReorder(refBlock.parts, otherBlock.parts);
+      if (partOrder) return partOrder;
+    }
+    if (div.partIndex != null) {
+      const refText = partText(refBlock?.parts[div.partIndex]);
+      const otherText = partText(otherBlock?.parts[div.partIndex]);
+      if (refText != null && otherText != null) {
+        const lines = detectLineReorder(refText, otherText);
+        if (lines) return lines;
+      }
     }
   }
 
   return null;
+}
+
+/** The same parts of a block in a different order, which is how a tool list assembled from a set appears. */
+function detectPartReorder(left: Part[], right: Part[]): Cause | null {
+  if (left.length !== right.length || left.length < 3) return null;
+  const leftKeys = left.map(partSignature);
+  const rightKeys = right.map(partSignature);
+  if (!isPermutation(leftKeys, rightKeys) || sameOrder(leftKeys, rightKeys)) return null;
+  return {
+    kind: 'ordering',
+    confidence: 'certain',
+    observation: 'the block holds the same items in a different order, which is how a tool list assembled without a stable sort appears',
+  };
 }
 
 function detectBlockReorder(left: Block[], right: Block[]): Cause | null {
