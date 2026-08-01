@@ -1,8 +1,9 @@
 import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
 import { checkCapturedStability, type StabilityReport } from '../engine/stability.js';
+import { checkChain } from '../engine/chain.js';
 import { adapterFor, detectProvider } from '../providers/adapters/index.js';
 import { loadTable, resolveProfile } from '../providers/table.js';
-import type { CanonicalRequest, Report } from '../types.js';
+import type { CanonicalRequest, ChainReport, Report } from '../types.js';
 
 /**
  * Test time request capture.
@@ -52,6 +53,12 @@ export interface Recorder {
    * prefix is identical. Throws when nothing was captured.
    */
   checkStability(options: StabilityCheckOptions): StabilityReport;
+  /**
+   * Treats the captured requests as the turns of one conversation, in capture
+   * order, and reports whether each turn reuses the prefix of the one before
+   * it. Throws when fewer than two requests were captured.
+   */
+  checkChain(options: StabilityCheckOptions): ChainReport;
   clear(): void;
   restore(): void;
 }
@@ -205,6 +212,23 @@ export function capture(options: CaptureOptions = {}): Recorder {
       if (!provider) throw new NothingCapturedError(matcherLabel);
       const profile = resolveProfile(loaded, provider, stabilityOptions.model);
       return checkCapturedStability(canonical, profile, stabilityOptions.model);
+    },
+
+    checkChain(chainOptions: StabilityCheckOptions): ChainReport {
+      if (captured.length === 0) throw new NothingCapturedError(matcherLabel);
+      const loaded = loadTable(chainOptions);
+      const canonical: CanonicalRequest[] = captured.map((request) => {
+        const provider = chainOptions.provider ?? detectProvider(loaded.table, request.body, request.url).provider;
+        return adapterFor(provider).parse(request.body, {
+          model: chainOptions.model,
+          fidelity: 'wire',
+          wireBytes: request.wireBytes,
+        });
+      });
+      const provider = chainOptions.provider ?? canonical[0]?.provider;
+      if (!provider) throw new NothingCapturedError(matcherLabel);
+      const profile = resolveProfile(loaded, provider, chainOptions.model);
+      return checkChain(canonical, profile, chainOptions.model);
     },
 
     clear: () => {

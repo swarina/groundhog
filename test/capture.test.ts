@@ -118,6 +118,27 @@ describe('request capture', () => {
     expect(() => active?.checkStability({ model: 'claude-sonnet-4-5', discover: false })).toThrow(NothingCapturedError);
   });
 
+  it('checks captured turns as a conversation chain', async () => {
+    active = capture();
+    const sys = 'You are a coding agent with tools. '.repeat(40);
+    const u1 = { role: 'user', content: 'list files' };
+    // The assistant message is re-serialised with a trailing space on the
+    // second turn, which is exactly the replay drift the chain check exists for.
+    const conversations = [
+      [u1, { role: 'assistant', content: 'ok' }],
+      [u1, { role: 'assistant', content: 'ok ' }, { role: 'user', content: 'next' }],
+    ];
+    for (const messages of conversations) {
+      await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'claude-sonnet-4-5', system: [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }], messages }),
+      });
+    }
+    const report = active.checkChain({ model: 'claude-sonnet-4-5', discover: false });
+    expect(report.ok).toBe(false);
+    expect(report.findings[0]?.code).toBe('GH130');
+  });
+
   it('refuses to report a pass when it captured nothing', () => {
     // A capture based check that inspected zero requests has verified nothing.
     // Reporting that as a pass would be the worst possible bug in this tool.
