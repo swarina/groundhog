@@ -3,9 +3,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { formatCount } from '../core/format.js';
 import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
+import { checkCapturedStability } from '../engine/stability.js';
+import { adapterFor, detectProvider } from '../providers/adapters/index.js';
 import { loadTable, resolveProfile } from '../providers/table.js';
 import { explain } from '../report/catalogue.js';
 import { renderReport } from '../report/render.js';
+import { renderStabilityReport } from '../report/stability.js';
 import type { Report } from '../types.js';
 import { boolFlag, parseArgs, stringFlag, UsageError, type ParsedArgs } from './args.js';
 
@@ -14,13 +17,18 @@ const DEFAULT_LOG = '.groundhog/requests.ndjson';
 const HELP = `groundhog  prompt cache checker
 
 usage
-  groundhog doctor [file]        check a request or a captured log
+  groundhog doctor [file]        check one request for cache qualification
+  groundhog check [file]         check a set of requests for a stable prefix
   groundhog providers list       list providers in the data table
   groundhog providers show <id> [model]
   groundhog explain <code>       full write-up for a finding code
 
-doctor reads a json request body, or an ndjson log written by the capture
-helper. With no file it looks for ${DEFAULT_LOG}.
+doctor inspects a single request: whether it qualifies to be cached at all.
+check compares a set of requests and reports whether their cacheable prefix is
+identical, which is what decides whether the cache pays across real traffic.
+
+both read a json request body, a json array of them, or an ndjson log written by
+the capture helper. With no file they look for ${DEFAULT_LOG}.
 
 flags
   --model <id>          model identifier, when the request body has none
@@ -56,6 +64,8 @@ function main(argv: string[]): number {
     switch (parsed.command) {
       case 'doctor':
         return runDoctor(parsed);
+      case 'check':
+        return runCheck(parsed);
       case 'providers':
         return runProviders(parsed);
       case 'explain':
@@ -166,6 +176,70 @@ function runDoctor(parsed: ParsedArgs): number {
 
   if (reports.some((report) => !report.ok)) return 1;
   if (boolFlag(parsed.flags, 'strict') && reports.some((report) => !report.certain)) return 3;
+  return 0;
+}
+
+function runCheck(parsed: ParsedArgs): number {
+  const path = parsed.positionals[0] ?? DEFAULT_LOG;
+  if (!existsSync(path)) {
+    if (parsed.positionals.length > 0) {
+      process.stderr.write(`No such file: ${path}\nPass a json array of requests, or an ndjson log written by the capture helper.\n`);
+      return 2;
+    }
+    process.stderr.write(
+      `Nothing to check. No file given and ${DEFAULT_LOG} does not exist.\n\n` +
+        'check compares a set of requests, so it needs more than one. Record the requests your tests make:\n\n' +
+        "  import { capture } from 'groundhog/capture';\n\n" +
+        '  const recorder = capture();\n' +
+        '  await runYourCodeTwice();\n' +
+        '  recorder.checkStability({ model: "your-model-id" });\n',
+    );
+    return 2;
+  }
+
+  const model = stringFlag(parsed.flags, 'model');
+  if (!model) {
+    process.stderr.write('The check needs a model, since the minimum cacheable length is model specific. Pass --model.\n');
+    return 2;
+  }
+
+  const loaded = loadTable(stringFlag(parsed.flags, 'provider-table') ? { table: stringFlag(parsed.flags, 'provider-table') } : {});
+  const requests = readRequests(path);
+  if (requests.length < 2) {
+    process.stderr.write(
+      `check compares a set of requests and this file has ${formatCount(requests.length)}.\n` +
+        'Use doctor for a single request, or capture more than one request into the log.\n',
+    );
+    return 2;
+  }
+
+  const providerFlag = stringFlag(parsed.flags, 'provider');
+  const canonical = requests.map((request) => {
+    const provider = providerFlag ?? detectProvider(loaded.table, request.body, request.url).provider;
+    return adapterFor(provider).parse(request.body, {
+      model,
+      fidelity: request.url ? 'wire' : 'builder',
+      ...(request.wireBytes != null ? { wireBytes: request.wireBytes } : {}),
+    });
+  });
+
+  const provider = providerFlag ?? canonical[0]?.provider;
+  if (!provider) {
+    process.stderr.write('Could not identify a provider for these requests. Pass --provider.\n');
+    return 2;
+  }
+  const profile = resolveProfile(loaded, provider, model);
+  const report = checkCapturedStability(canonical, profile, model);
+
+  if (boolFlag(parsed.flags, 'json')) {
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+  } else {
+    const widthFlag = stringFlag(parsed.flags, 'width');
+    process.stdout.write(renderStabilityReport(report, { color: shouldColor(parsed), width: widthFlag ? Number.parseInt(widthFlag, 10) : 80 }));
+  }
+
+  if (!report.ok) return 1;
+  if (boolFlag(parsed.flags, 'strict') && !report.certain) return 3;
   return 0;
 }
 
