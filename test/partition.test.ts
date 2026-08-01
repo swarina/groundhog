@@ -49,21 +49,26 @@ describe('partition shape', () => {
   });
 
   it('does not claim an axis when the grouping does not follow one', () => {
-    // Negative case. Two groups exist but neither dimension explains them, so
-    // naming a cause here would be a guess dressed as evidence.
+    // Negative case. Every cell is internally consistent, so this is not per
+    // call variation, but the hash tracks the combination of input and
+    // environment rather than either alone. Naming one axis would be a guess.
     const result = analysePartition([
-      run(0, 0, 'baseline', 'h1'),
-      run(0, 1, 'baseline', 'h2'),
-      run(1, 0, 'baseline', 'h1'),
-      run(1, 1, 'baseline', 'h1'),
+      run(0, 0, 'env-a', 'h1'),
+      run(0, 1, 'env-a', 'h1'),
+      run(1, 0, 'env-a', 'h2'),
+      run(1, 1, 'env-a', 'h2'),
+      run(0, 0, 'env-b', 'h2'),
+      run(0, 1, 'env-b', 'h2'),
+      run(1, 0, 'env-b', 'h1'),
+      run(1, 1, 'env-b', 'h1'),
     ]);
     expect(result.shape).toBe('mixed');
     expect(result.dimension).toBeUndefined();
   });
 
-  it('does not call a dimension responsible when it only has one value', () => {
-    // Every run is in the same environment, so the environment cannot be what
-    // distinguishes the groups even though the hashes differ.
+  it('treats different repeats of one input in one environment as per call drift', () => {
+    // Same input, same environment, different hash. That is per call variation
+    // by definition, whatever the other axes show.
     const result = analysePartition([
       run(0, 0, 'baseline', 'h1'),
       run(0, 1, 'baseline', 'h2'),

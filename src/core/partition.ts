@@ -40,6 +40,21 @@ export interface Partition {
   evidence: string;
 }
 
+/** True when any input and environment cell contains more than one hash. */
+function repeatsDifferWithinACell(runs: RunDescriptor[]): boolean {
+  const cells = new Map<string, Set<string>>();
+  for (const run of runs) {
+    const key = `${run.axis}\t${run.inputIndex}`;
+    const hashes = cells.get(key) ?? new Set<string>();
+    hashes.add(run.hash);
+    cells.set(key, hashes);
+  }
+  for (const hashes of cells.values()) {
+    if (hashes.size > 1) return true;
+  }
+  return false;
+}
+
 function groupBy(runs: RunDescriptor[]): PartitionGroup[] {
   const groups = new Map<string, number[]>();
   for (const run of runs) {
@@ -78,13 +93,18 @@ export function analysePartition(runs: RunDescriptor[]): Partition {
     };
   }
 
-  if (groups.length === runs.length && runs.length > 1) {
+  // Per call variation is the most fundamental signal, so it is checked first
+  // and on its own terms. If repeats of one input inside one environment differ,
+  // something changes on every call, and that is true regardless of what the
+  // seeded axes show. Pooling every axis first would hide it whenever a seeded
+  // axis happens to pin the varying value.
+  if (repeatsDifferWithinACell(runs)) {
     return {
       groups,
       shape: 'varies-per-run',
       evidence:
-        `every one of the ${runs.length} prefixes differed from every other, including repeats of the same input ` +
-        'in the same environment, which means something changes on each call rather than with the input or the environment',
+        'repeats of the same input in the same environment produced different prefixes, ' +
+        'which means something changes on each call rather than with the input or the environment',
     };
   }
 
