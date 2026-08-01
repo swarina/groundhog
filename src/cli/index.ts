@@ -4,11 +4,13 @@ import { extname } from 'node:path';
 import { formatCount } from '../core/format.js';
 import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
 import { checkCapturedStability } from '../engine/stability.js';
+import { checkChain } from '../engine/chain.js';
 import { adapterFor, detectProvider } from '../providers/adapters/index.js';
 import { loadTable, resolveProfile } from '../providers/table.js';
 import { explain } from '../report/catalogue.js';
 import { renderReport } from '../report/render.js';
 import { renderStabilityReport } from '../report/stability.js';
+import { renderChainReport } from '../report/chain.js';
 import type { Report } from '../types.js';
 import { boolFlag, parseArgs, stringFlag, UsageError, type ParsedArgs } from './args.js';
 
@@ -19,6 +21,7 @@ const HELP = `groundhog  prompt cache checker
 usage
   groundhog doctor [file]        check one request for cache qualification
   groundhog check [file]         check a set of requests for a stable prefix
+  groundhog chain [file]         check a conversation for prefix reuse per turn
   groundhog providers list       list providers in the data table
   groundhog providers show <id> [model]
   groundhog explain <code>       full write-up for a finding code
@@ -26,8 +29,10 @@ usage
 doctor inspects a single request: whether it qualifies to be cached at all.
 check compares a set of requests and reports whether their cacheable prefix is
 identical, which is what decides whether the cache pays across real traffic.
+chain reads the turns of one conversation, in order, and reports whether each
+turn reuses the prefix of the one before it.
 
-both read a json request body, a json array of them, or an ndjson log written by
+all read a json request body, a json array of them, or an ndjson log written by
 the capture helper. With no file they look for ${DEFAULT_LOG}.
 
 flags
@@ -66,6 +71,8 @@ function main(argv: string[]): number {
         return runDoctor(parsed);
       case 'check':
         return runCheck(parsed);
+      case 'chain':
+        return runChain(parsed);
       case 'providers':
         return runProviders(parsed);
       case 'explain':
@@ -241,6 +248,58 @@ function runCheck(parsed: ParsedArgs): number {
   if (!report.ok) return 1;
   if (boolFlag(parsed.flags, 'strict') && !report.certain) return 3;
   return 0;
+}
+
+function runChain(parsed: ParsedArgs): number {
+  const path = parsed.positionals[0] ?? DEFAULT_LOG;
+  if (!existsSync(path)) {
+    process.stderr.write(
+      parsed.positionals.length > 0
+        ? `No such file: ${path}\nPass an ndjson log or a json array holding the turns of one conversation, in order.\n`
+        : `Nothing to check. No file given and ${DEFAULT_LOG} does not exist.\n` +
+            'chain needs the turns of one conversation. Record them with the capture helper, then call recorder.checkChain({ model }).\n',
+    );
+    return 2;
+  }
+
+  const model = stringFlag(parsed.flags, 'model');
+  if (!model) {
+    process.stderr.write('The chain check needs a model. Pass --model.\n');
+    return 2;
+  }
+
+  const loaded = loadTable(stringFlag(parsed.flags, 'provider-table') ? { table: stringFlag(parsed.flags, 'provider-table') } : {});
+  const requests = readRequests(path);
+  if (requests.length < 2) {
+    process.stderr.write(`A chain check needs at least two turns and this file has ${formatCount(requests.length)}.\n`);
+    return 2;
+  }
+
+  const providerFlag = stringFlag(parsed.flags, 'provider');
+  const canonical = requests.map((request) => {
+    const provider = providerFlag ?? detectProvider(loaded.table, request.body, request.url).provider;
+    return adapterFor(provider).parse(request.body, {
+      model,
+      fidelity: request.url ? 'wire' : 'builder',
+      ...(request.wireBytes != null ? { wireBytes: request.wireBytes } : {}),
+    });
+  });
+
+  const provider = providerFlag ?? canonical[0]?.provider;
+  if (!provider) {
+    process.stderr.write('Could not identify a provider for these turns. Pass --provider.\n');
+    return 2;
+  }
+  const report = checkChain(canonical, resolveProfile(loaded, provider, model), model);
+
+  if (boolFlag(parsed.flags, 'json')) {
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n');
+  } else {
+    const widthFlag = stringFlag(parsed.flags, 'width');
+    process.stdout.write(renderChainReport(report, { color: shouldColor(parsed), width: widthFlag ? Number.parseInt(widthFlag, 10) : 80 }));
+  }
+
+  return report.ok ? 0 : 1;
 }
 
 function runProviders(parsed: ParsedArgs): number {
