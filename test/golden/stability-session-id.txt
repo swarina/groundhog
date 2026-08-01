@@ -4,15 +4,16 @@ shared prefix 1,757 tokens (estimate, plus or minus 12%), where the runs stop
               agreeing
 full request  1,759 tokens (estimate, plus or minus 12%)
 
-FAIL  GH120  the cacheable prefix is not identical between runs
+FAIL  GH120  the cacheable prefix is not identical between runs: the content
+             differs
       confidence: probable
 
   The effective shared prefix is 1,757 tokens out of 1,759 in a full request.
   Everything past the shared part is billed at the full rate on every request.
 
-  the prefix is identical for repeats of the same input and differs between
-  inputs, across 2 groups, which means per request data is sitting inside the
-  part meant to be shared.
+  The value that changes is not a recognised volatile pattern, so the cached
+  part is carrying content that genuinely differs. It varies with the input, so
+  it is per request data that has reached the shared prefix.
 
   The prefixes first differ at byte 6,943 of block 0 (system), after 6,943
   shared content bytes.
@@ -24,9 +25,8 @@ FAIL  GH120  the cacheable prefix is not identical between runs
   - 3f9a2c11
   + 8b1d4e07
 
-  Fix: Per request data is sitting in the part meant to be shared. Move the
-  user, tenant, or session specific value out of the cached prefix and into the
-  final message.
+  Fix: The cached part is carrying content that genuinely differs between
+  requests. Move the varying content below the cache boundary.
 
   Cost: 2 tokens at the full input rate on every request, 0.000006 USD instead
   of 0.000001 USD, a difference of 0.000005 USD per request. Prices are

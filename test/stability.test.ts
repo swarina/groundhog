@@ -48,22 +48,21 @@ describe('checkStablePrefix', () => {
     expect(finding?.diff?.some((line) => line.startsWith('+ '))).toBe(true);
   });
 
-  it('points a date dependency at the environment', async () => {
+  it('names a date and places it in the environment', async () => {
     // Date granularity keeps the unpatched baseline axis from racing a tick.
     const report = await checkStablePrefix(() => body(stable + 'today is ' + new Date().toISOString().slice(0, 10)), opts);
     const finding = report.findings[0];
+    expect(finding?.title).toContain('timestamp');
     expect(finding?.detail.join(' ')).toContain('environment');
-    expect(finding?.fix).toContain('clock');
   });
 
-  it('points per input drift at the request data', async () => {
+  it('places per input drift with the request data', async () => {
     const report = await checkStablePrefix((input: { tenant: string }) => body(stable + 'tenant: ' + input.tenant), {
       ...opts,
       inputs: [{ tenant: 'acme' }, { tenant: 'globex' }],
     });
     const finding = report.findings[0];
     expect(finding?.detail.join(' ')).toContain('per request data');
-    expect(finding?.fix).toContain('tenant');
   });
 
   it('flags a stable prefix that is too short to cache', async () => {
