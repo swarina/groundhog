@@ -1,11 +1,12 @@
 import { buildDiffWindow, renderDiffWindow } from '../core/diff.js';
 import type { Divergence } from '../core/diverge.js';
 import { formatCount } from '../core/format.js';
-import type { Partition } from '../core/partition.js';
+import { classifyCause } from '../classify/cause/classify.js';
+import type { Cause, CauseKind } from '../classify/cause/types.js';
 import { costOfUncachedTokens } from '../classify/cost.js';
 import { comparablePrefix } from '../core/span.js';
 import { compareToThreshold, estimateBlocks } from '../tokens/estimate.js';
-import type { CanonicalPrefix, CanonicalRequest, Confidence, Finding, ProviderProfile, StabilityReport, TokenEstimate } from '../types.js';
+import type { CanonicalPrefix, CanonicalRequest, Finding, ProviderProfile, StabilityReport, TokenEstimate } from '../types.js';
 import { compareCanonical, runMatrix, type BuildFn, type MatrixOptions, type MatrixResult } from '../runner/matrix.js';
 
 export type { StabilityReport } from '../types.js';
@@ -20,29 +21,47 @@ export type { StabilityReport } from '../types.js';
  * explicitly and one that caches implicitly with no control surface at all.
  */
 
-const FIX_BY_SHAPE: Record<Partition['shape'], string> = {
-  stable: '',
-  'varies-per-run':
-    'A value is generated on each call. Look for a timestamp, a uuid, a random sample, or a counter in the ' +
-    'cached span, and move it below the cache boundary or remove it.',
-  'varies-by-input':
-    'Per request data is sitting in the part meant to be shared. Move the user, tenant, or session specific ' +
-    'value out of the cached prefix and into the final message.',
-  'varies-by-environment':
-    'The prefix depends on the clock, the timezone, or the random stream. Move that dependency below the cache ' +
-    'boundary, or pin it, so the cached part is the same on every machine and every day.',
-  mixed:
-    'The order of something in the prefix is not stable. Look for tool definitions from an unordered registry, ' +
-    'retrieved documents in a nondeterministic rank order, or object keys assembled in varying order, and sort them.',
+const FIX_BY_KIND: Record<CauseKind, string> = {
+  timestamp:
+    'Move the timestamp out of the cached span, into the final user message below the boundary, or drop it to a ' +
+    'coarser granularity if the model only needs the date.',
+  uuid: 'Move the identifier below the cache boundary. A request id, trace id, or session id belongs with the request, not in the cached prefix.',
+  counter: 'Move the counter out of the cached span. A value that increments on every call cannot be part of a shared prefix.',
+  random: 'If this is a generated value, move it below the cache boundary. If it is a content hash, the content it covers is what changed, so look there.',
+  ordering:
+    'Sort the elements into a stable order before they enter the prompt. Tool definitions, retrieved documents, and object keys ' +
+    'assembled from a set need an explicit sort, since their natural order is not stable.',
+  content: 'The cached part is carrying content that genuinely differs between requests. Move the varying content below the cache boundary.',
+  structural:
+    'Keep the block and part structure of the prompt identical between requests. A block that is sometimes present and sometimes ' +
+    'absent, or that changes type, breaks the cache even when the text is the same.',
 };
 
-function confidenceForShape(shape: Partition['shape']): Confidence {
-  // The environment and input shapes are demonstrated by a clean split along an
-  // axis, so they are stated with more confidence than the mixed case, which
-  // only narrows the cause to ordering.
-  if (shape === 'varies-by-environment' || shape === 'varies-by-input') return 'probable';
-  if (shape === 'varies-per-run') return 'probable';
-  return 'possible';
+/** One line placing the cause in the axis the partition identified. */
+function whereClause(cause: Cause, shape: string, dimension?: string): string {
+  if (cause.kind === 'ordering' || cause.kind === 'structural') return '';
+  if (dimension === 'input') return ' It varies with the input, so it is per request data that has reached the shared prefix.';
+  if (dimension === 'environment') return ' It varies with the environment, so it depends on the clock, timezone, or random stream.';
+  if (shape === 'varies-per-run') return ' It changes on every call.';
+  return '';
+}
+
+const CAUSE_LABEL: Record<CauseKind, string> = {
+  timestamp: 'a timestamp changes',
+  uuid: 'an identifier changes',
+  counter: 'a counter increments',
+  random: 'a high entropy value changes',
+  ordering: 'the order is not stable',
+  content: 'the content differs',
+  structural: 'the structure differs',
+};
+
+function causeLabel(kind: CauseKind): string {
+  return CAUSE_LABEL[kind];
+}
+
+function capitalise(text: string): string {
+  return text.length === 0 ? text : text[0]?.toUpperCase() + text.slice(1);
 }
 
 function locationText(divergence: Divergence): string[] {
@@ -83,23 +102,24 @@ function summarise(result: MatrixResult, profile: ProviderProfile, model: string
   const findings: Finding[] = [];
 
   if (!result.shared.complete && result.divergence) {
-    const shape = result.partition.shape;
+    const cause = classifyCause(result);
     const lost = fullTokens.value - sharedTokens.value;
     const cost = costOfUncachedTokens(lost, profile);
     const diff = diffLines(result);
+    const where = whereClause(cause, result.partition.shape, result.partition.dimension);
 
     findings.push({
       code: 'GH120',
       severity: 'fail',
-      confidence: confidenceForShape(shape),
-      title: 'the cacheable prefix is not identical between runs',
+      confidence: cause.confidence,
+      title: `the cacheable prefix is not identical between runs: ${causeLabel(cause.kind)}`,
       detail: [
         `The effective shared prefix is ${formatCount(sharedTokens.value)} tokens out of ${formatCount(fullTokens.value)} ` +
           `in a full request. Everything past the shared part is billed at the full rate on every request.`,
-        result.partition.evidence + '.',
+        capitalise(cause.observation) + '.' + where,
         ...locationText(result.divergence),
       ],
-      fix: FIX_BY_SHAPE[shape],
+      fix: FIX_BY_KIND[cause.kind],
       location: {
         blockIndex: result.divergence.blockIndex,
         blockKind: result.divergence.blockKind,
