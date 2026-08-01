@@ -29,6 +29,12 @@ export interface MatrixOptions<I> {
   perturb?: boolean;
   /** Instant the clock axes pin to. Injected so a run is reproducible. */
   clockInstantMs?: number;
+  /**
+   * Extracts the blocks whose stability matters from a request. Defaults to the
+   * whole request. Stability passes one that drops the part meant to vary below
+   * the cache boundary, so a differing final turn is not read as instability.
+   */
+  prefixOf?: (request: CanonicalRequest) => CanonicalPrefix;
 }
 
 export interface MatrixRun {
@@ -78,6 +84,7 @@ export async function runMatrix<I>(build: BuildFn<I>, options: MatrixOptions<I>)
       ? safePerturbations(clockInstant).filter((axis) => axis.label === BASELINE_LABEL)
       : safePerturbations(clockInstant);
 
+  const prefixOf = options.prefixOf ?? ((request: CanonicalRequest) => request.blocks);
   const runs: MatrixRun[] = [];
   let index = 0;
 
@@ -87,16 +94,11 @@ export async function runMatrix<I>(build: BuildFn<I>, options: MatrixOptions<I>)
       for (let inputIndex = 0; inputIndex < inputs.length; inputIndex += 1) {
         for (let repeatIndex = 0; repeatIndex < repeats; repeatIndex += 1) {
           const request = await buildCanonical(build, inputs[inputIndex] as I, options.provider, options.model);
+          const prefix = prefixOf(request);
           runs.push({
-            descriptor: {
-              index: index++,
-              inputIndex,
-              repeatIndex,
-              axis: axis.label,
-              hash: prefixHash(request.blocks),
-            },
+            descriptor: { index: index++, inputIndex, repeatIndex, axis: axis.label, hash: prefixHash(prefix) },
             request,
-            prefix: request.blocks,
+            prefix,
           });
         }
       }
@@ -109,12 +111,18 @@ export async function runMatrix<I>(build: BuildFn<I>, options: MatrixOptions<I>)
 }
 
 /** Same comparison over prefixes captured from real requests rather than built. */
-export function compareCanonical(requests: CanonicalRequest[]): MatrixResult {
-  const runs: MatrixRun[] = requests.map((request, index) => ({
-    descriptor: { index, inputIndex: index, repeatIndex: 0, axis: BASELINE_LABEL, hash: prefixHash(request.blocks) },
-    request,
-    prefix: request.blocks,
-  }));
+export function compareCanonical(
+  requests: CanonicalRequest[],
+  prefixOf: (request: CanonicalRequest) => CanonicalPrefix = (request) => request.blocks,
+): MatrixResult {
+  const runs: MatrixRun[] = requests.map((request, index) => {
+    const prefix = prefixOf(request);
+    return {
+      descriptor: { index, inputIndex: index, repeatIndex: 0, axis: BASELINE_LABEL, hash: prefixHash(prefix) },
+      request,
+      prefix,
+    };
+  });
   return summarise(runs, [{ label: BASELINE_LABEL, description: 'captured requests, compared as sent', apply: () => () => undefined }]);
 }
 

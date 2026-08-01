@@ -36,10 +36,12 @@ describe('matrix runner', () => {
     expect(result.divergence).not.toBeNull();
   });
 
-  it('catches a clock read even though it is stable within a process moment', async () => {
-    // Date.now() repeats inside one frozen environment, so only moving the
-    // clock axis reveals it. This is the case a repeat only check misses.
-    const result = await runMatrix(() => body(base + 'now: ' + new Date().toISOString()), opts);
+  it('catches a date that only rolls over between environments', async () => {
+    // A date is stable across repeats within a day, so a repeat only check sees
+    // nothing. Moving the clock 26 hours crosses a day boundary and reveals it.
+    // Date granularity is used rather than a millisecond timestamp so the
+    // unpatched baseline axis does not race a clock tick.
+    const result = await runMatrix(() => body(base + 'today is ' + new Date().toISOString().slice(0, 10)), opts);
     expect(result.partition.shape).toBe('varies-by-environment');
     expect(result.partition.dimension).toBe('environment');
   });

@@ -67,6 +67,28 @@ export function resolveSpan(request: CanonicalRequest, profile: ProviderProfile)
 }
 
 /**
+ * The blocks whose stability actually matters.
+ *
+ * A request is meant to vary below its cache boundary: the final user turn is
+ * different on every call and that is the point. Comparing whole requests would
+ * flag that as instability, so stability is assessed only on the part that is
+ * meant to repeat.
+ *
+ * When the request declares a boundary, that is the cut. Otherwise the trailing
+ * user turn is dropped, which is the part that varies on a provider that caches
+ * the longest matching prefix automatically.
+ */
+export function comparablePrefix(request: CanonicalRequest, profile: ProviderProfile): Block[] {
+  const span = resolveSpan(request, profile);
+  if (span.boundaryMode === 'explicit' && span.declaredMarkers > 0) return span.blocks;
+
+  const blocks = request.blocks;
+  const last = blocks[blocks.length - 1];
+  if (last && last.kind === 'message' && last.role === 'user') return blocks.slice(0, -1);
+  return blocks;
+}
+
+/**
  * Tokens actually billed at the cached rate once the provider floor and
  * granularity are applied.
  *
