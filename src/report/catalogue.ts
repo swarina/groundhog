@@ -90,6 +90,30 @@ export const CATALOGUE: Record<string, CatalogueEntry> = {
     detects: ['hit rate falling as traffic grows', 'hit rate good in staging and poor in production'],
   },
 
+  GH120: {
+    code: 'GH120',
+    title: 'The cacheable prefix is not identical between runs',
+    what:
+      'The part of the prompt meant to be shared between requests was not the same on every run. The cache matches ' +
+      'on an exact prefix, so from the first differing byte onward nothing is served from cache.',
+    why:
+      'This is the failure the tool exists to find. It produces no error, the responses are normal, and the only ' +
+      'symptom is a bill. The shape of the difference across runs points at the cause: a value that changes on every ' +
+      'call is a timestamp or a uuid or a random draw, a value that tracks the input is per request data in the shared ' +
+      'part, a value that tracks the environment is a clock or timezone or locale dependency, and an unstable order is ' +
+      'a tool list or a set of retrieved documents that is not sorted.',
+    fix:
+      'Move whatever changes out of the cached prefix and below the boundary, or make it deterministic. The report ' +
+      'names the byte where the prefix first diverged and shows the differing span, so the source is usually a short ' +
+      'search from there.',
+    detects: [
+      'a timestamp or date interpolated into the system prompt',
+      'a request id, trace id, or session id above the boundary',
+      'per user or per tenant data in the cached part',
+      'tool definitions or retrieved documents in an unstable order',
+    ],
+  },
+
   GH110: {
     code: 'GH110',
     title: 'Provider data is out of date',

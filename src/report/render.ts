@@ -67,6 +67,11 @@ export function renderReport(report: Report, options: RenderOptions = {}): strin
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }
 
+/** Shared by the single request report and the stability report. */
+export function renderFindingBlock(finding: Finding, width: number, color: boolean): string[] {
+  return renderFinding(finding, width, painter(color));
+}
+
 function renderFinding(finding: Finding, width: number, paint: Painter): string[] {
   const lines: string[] = [];
   const tag = finding.severity.toUpperCase().padEnd(4);
@@ -84,6 +89,11 @@ function renderFinding(finding: Finding, width: number, paint: Painter): string[
     lines.push('');
   }
 
+  if (finding.diff && finding.diff.length > 0) {
+    for (const line of finding.diff) lines.push(`  ${clip(line, width - 2)}`);
+    lines.push('');
+  }
+
   for (const line of wrap(`Fix: ${finding.fix}`, width - 2)) lines.push(`  ${line}`);
 
   if (finding.cost) {
@@ -94,8 +104,9 @@ function renderFinding(finding: Finding, width: number, paint: Painter): string[
   if (finding.location) {
     const loc = finding.location;
     const at = loc.byteOffset != null ? `byte ${formatCount(loc.byteOffset)}, ` : '';
+    const role = loc.role && loc.role !== loc.blockKind ? ', ' + loc.role : '';
     lines.push('');
-    lines.push(`  Location: ${at}block ${loc.blockIndex} (${loc.blockKind}${loc.role ? ', ' + loc.role : ''})`);
+    lines.push(`  Location: ${at}block ${loc.blockIndex} (${loc.blockKind}${role})`);
   }
 
   return lines;
@@ -193,6 +204,11 @@ type Painter = (text: string, color: keyof typeof COLORS) => string;
 function painter(enabled: boolean): Painter {
   if (!enabled) return (text) => text;
   return (text, color) => `${COLORS[color]}${text}${COLORS.reset}`;
+}
+
+/** Truncates a pre-formatted line rather than wrapping it, so a diff stays aligned. */
+function clip(text: string, width: number): string {
+  return text.length <= width ? text : text.slice(0, width - 1) + '…';
 }
 
 export function wrap(text: string, width: number): string[] {
