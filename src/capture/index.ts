@@ -1,5 +1,8 @@
 import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
-import type { Report } from '../types.js';
+import { checkCapturedStability, type StabilityReport } from '../engine/stability.js';
+import { adapterFor, detectProvider } from '../providers/adapters/index.js';
+import { loadTable, resolveProfile } from '../providers/table.js';
+import type { CanonicalRequest, Report } from '../types.js';
 
 /**
  * Test time request capture.
@@ -36,10 +39,19 @@ export interface CaptureOptions {
   match?: (url: string) => boolean;
 }
 
+export interface StabilityCheckOptions extends InspectOptions {
+  model: string;
+}
+
 export interface Recorder {
   requests(): CapturedRequest[];
   /** One report per captured request. Throws when nothing was captured. */
   inspect(options?: InspectOptions): Report[];
+  /**
+   * Compares the captured requests as a set and reports whether their cacheable
+   * prefix is identical. Throws when nothing was captured.
+   */
+  checkStability(options: StabilityCheckOptions): StabilityReport;
   clear(): void;
   restore(): void;
 }
@@ -173,6 +185,26 @@ export function capture(options: CaptureOptions = {}): Recorder {
           wireBytes: request.wireBytes,
         }),
       );
+    },
+
+    checkStability(stabilityOptions: StabilityCheckOptions): StabilityReport {
+      if (captured.length === 0) throw new NothingCapturedError(matcherLabel);
+      const loaded = loadTable(stabilityOptions);
+
+      const canonical: CanonicalRequest[] = captured.map((request) => {
+        const provider =
+          stabilityOptions.provider ?? detectProvider(loaded.table, request.body, request.url).provider;
+        return adapterFor(provider).parse(request.body, {
+          model: stabilityOptions.model,
+          fidelity: 'wire',
+          wireBytes: request.wireBytes,
+        });
+      });
+
+      const provider = canonical[0]?.provider ?? stabilityOptions.provider;
+      if (!provider) throw new NothingCapturedError(matcherLabel);
+      const profile = resolveProfile(loaded, provider, stabilityOptions.model);
+      return checkCapturedStability(canonical, profile, stabilityOptions.model);
     },
 
     clear: () => {

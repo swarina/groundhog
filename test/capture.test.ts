@@ -75,6 +75,49 @@ describe('request capture', () => {
     expect(report?.provider).toBe('anthropic');
   });
 
+  it('compares captured requests for a shared prefix', async () => {
+    active = capture();
+    const shared = 'You are a support agent. Answer from the knowledge base. '.repeat(140);
+    for (const query of ['reset password', 'where is my order']) {
+      await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          system: [{ type: 'text', text: shared, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: query }],
+        }),
+      });
+    }
+    const report = active.checkStability({ model: 'claude-sonnet-4-5', discover: false });
+    expect(report.shared.complete).toBe(true);
+    expect(report.ok).toBe(true);
+  });
+
+  it('catches per request data in the shared part of captured requests', async () => {
+    active = capture();
+    const shared = 'You are a support agent. Answer from the knowledge base. '.repeat(140);
+    for (const tenant of ['acme', 'globex']) {
+      await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          // The tenant is interpolated into the cached system prompt, which is
+          // the mistake that fragments a cache across a whole customer base.
+          model: 'claude-sonnet-4-5',
+          system: [{ type: 'text', text: shared + ' tenant: ' + tenant, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: 'question' }],
+        }),
+      });
+    }
+    const report = active.checkStability({ model: 'claude-sonnet-4-5', discover: false });
+    expect(report.ok).toBe(false);
+    expect(report.findings[0]?.code).toBe('GH120');
+  });
+
+  it('refuses to report stability when it captured nothing', () => {
+    active = capture();
+    expect(() => active?.checkStability({ model: 'claude-sonnet-4-5', discover: false })).toThrow(NothingCapturedError);
+  });
+
   it('refuses to report a pass when it captured nothing', () => {
     // A capture based check that inspected zero requests has verified nothing.
     // Reporting that as a pass would be the worst possible bug in this tool.
