@@ -5,12 +5,14 @@ import { formatCount } from '../core/format.js';
 import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
 import { checkCapturedStability } from '../engine/stability.js';
 import { checkChain } from '../engine/chain.js';
+import { auditLog } from '../engine/audit.js';
 import { adapterFor, detectProvider } from '../providers/adapters/index.js';
 import { loadTable, resolveProfile } from '../providers/table.js';
 import { explain } from '../report/catalogue.js';
 import { renderReport } from '../report/render.js';
 import { renderStabilityReport } from '../report/stability.js';
 import { renderChainReport } from '../report/chain.js';
+import { renderAudit } from '../report/audit.js';
 import type { Report } from '../types.js';
 import { boolFlag, parseArgs, stringFlag, UsageError, type ParsedArgs } from './args.js';
 
@@ -22,6 +24,7 @@ usage
   groundhog doctor [file]        check one request for cache qualification
   groundhog check [file]         check a set of requests for a stable prefix
   groundhog chain [file]         check a conversation for prefix reuse per turn
+  groundhog audit <log>          decompose cache loss over a log of real requests
   groundhog providers list       list providers in the data table
   groundhog providers show <id> [model]
   groundhog explain <code>       full write-up for a finding code
@@ -31,9 +34,11 @@ check compares a set of requests and reports whether their cacheable prefix is
 identical, which is what decides whether the cache pays across real traffic.
 chain reads the turns of one conversation, in order, and reports whether each
 turn reuses the prefix of the one before it.
+audit reads a log of real requests with their usage and reports how far the
+cache hit rate sits below what the traffic could reach, and why.
 
-all read a json request body, a json array of them, or an ndjson log written by
-the capture helper. With no file they look for ${DEFAULT_LOG}.
+the request checks read a json request body, a json array of them, or an ndjson
+log. With no file they look for ${DEFAULT_LOG}.
 
 flags
   --model <id>          model identifier, when the request body has none
@@ -73,6 +78,8 @@ function main(argv: string[]): number {
         return runCheck(parsed);
       case 'chain':
         return runChain(parsed);
+      case 'audit':
+        return runAudit(parsed);
       case 'providers':
         return runProviders(parsed);
       case 'explain':
@@ -300,6 +307,34 @@ function runChain(parsed: ParsedArgs): number {
   }
 
   return report.ok ? 0 : 1;
+}
+
+function runAudit(parsed: ParsedArgs): number {
+  const path = parsed.positionals[0];
+  if (!path) {
+    process.stderr.write(
+      'audit needs a log file.\n\n' +
+        'A log is a set of ndjson records, one per request, each with a timestamp, the model, the cacheable\n' +
+        'prefix hash, and the usage the response reported. Produce one in production with a recording client,\n' +
+        'then run:\n\n' +
+        '  groundhog audit requests.ndjson\n',
+    );
+    return 2;
+  }
+  if (!existsSync(path)) {
+    process.stderr.write(`No such file: ${path}\n`);
+    return 2;
+  }
+
+  const results = auditLog(path, stringFlag(parsed.flags, 'provider-table') ? { table: stringFlag(parsed.flags, 'provider-table') } : {});
+
+  if (boolFlag(parsed.flags, 'json')) {
+    process.stdout.write(JSON.stringify(results, null, 2) + '\n');
+  } else {
+    const widthFlag = stringFlag(parsed.flags, 'width');
+    process.stdout.write(renderAudit(results, { color: shouldColor(parsed), width: widthFlag ? Number.parseInt(widthFlag, 10) : 80 }));
+  }
+  return 0;
 }
 
 function runProviders(parsed: ParsedArgs): number {

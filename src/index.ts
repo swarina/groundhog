@@ -1,6 +1,12 @@
 export { inspectRequest, MissingModelError, type InspectOptions } from './engine/inspect.js';
 export { checkBuilderStability, checkCapturedStability } from './engine/stability.js';
 export { checkChain } from './engine/chain.js';
+export { auditRecords, auditLog, auditText } from './engine/audit.js';
+export { decompose, type AuditResult, type BucketSummary, type LossBucket, type PrefixSummary } from './audit/decompose.js';
+export { normaliseUsage, parseLog, readLog, LogFormatError } from './audit/ingest.js';
+export { buildAuditRecord, auditRecordLine, type RecordInput } from './audit/record.js';
+export { renderAudit, renderAuditResult } from './report/audit.js';
+export type { AuditRecord, NormalisedUsage } from './audit/types.js';
 export { checkStablePrefix, expectStablePrefix, PrefixInstabilityError, type StableCheckOptions } from './assert/index.js';
 export { checkPrefixChainOf, expectPrefixChain, BrokenChainError, type ChainCheckOptions } from './assert/chain.js';
 export { renderChainReport } from './report/chain.js';

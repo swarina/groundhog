@@ -81,6 +81,8 @@ dashboard.
 
 ## What it checks today
 
+One request, whether it qualifies to be cached at all:
+
 | Code | Finding |
 | --- | --- |
 | GH101 | No cache boundary declared, on a provider that caches nothing without one |
@@ -91,11 +93,72 @@ dashboard.
 | GH106 | No cache routing key, where hits depend on reaching the same backend |
 | GH110 | The provider data used for the run is out of date |
 
-`groundhog explain GH102` prints the full write-up for any of them.
+A set of requests, whether the cacheable prefix stays identical, which is what
+decides whether the cache pays across real traffic:
 
-These are single request checks. Whether a prefix stays identical between
-requests is a different question, and one request cannot answer it. Groundhog
-says so on every run rather than implying a stability result it did not measure.
+| Code | Finding |
+| --- | --- |
+| GH120 | The cacheable prefix is not identical between runs, classified by cause: a timestamp, a uuid, a counter, a random value, an unstable order, or genuine content |
+| GH130 | A conversation stops reusing its prefix at a turn, because an earlier turn was re-rendered on replay |
+
+`groundhog explain GH120` prints the full write-up for any of them.
+
+## The four commands
+
+```
+groundhog doctor request.json --model claude-sonnet-4-5   one request, does it qualify
+groundhog check requests.json --model claude-sonnet-4-5   a set, is the prefix stable
+groundhog chain turns.ndjson  --model claude-sonnet-4-5   a conversation, per turn reuse
+groundhog audit requests.ndjson                           real traffic, where the loss goes
+```
+
+The determinism check runs the builder across a matrix: repeats catch what
+changes on every call, varied inputs catch per request data above the boundary,
+and a frozen clock, shifted timezone, and reseeded randomness catch environment
+dependencies that would otherwise repeat inside one process and differ
+everywhere else. When the prefix breaks it names the byte, shows the diff, and
+classifies the cause.
+
+## The audit
+
+Raw hit rate is a misleading target: even a perfect application pays one cache
+write per prefix per time to live window. The audit measures how far the
+observed rate sits below what the traffic could reach, and splits the gap by
+cause.
+
+```
+anthropic / claude-sonnet-4-6
+requests      36 over 12 minutes
+observed      69.4% hit rate
+achievable    97.2% given this traffic and window
+recoverable   27.8%, about 0.0567 USD across this log
+
+where it goes
+   22.2%  prefix fragmentation (8 requests, 0.0454 USD)
+    2.8%  time to live expiry (1 request)
+    2.8%  routing or scope (1 request)
+    2.8%  necessary cold writes (1 request)
+```
+
+It reads an NDJSON log, one record per request, each carrying a timestamp, the
+model, the cacheable prefix hash, and the usage the response reported. No prompt
+content is needed. Build the records in production with `buildAuditRecord`, which
+turns a request and its response usage into one log line and keeps no content:
+
+```ts
+import { auditRecordLine } from 'groundhog';
+
+const line = auditRecordLine({
+  body: requestBody,
+  usage: response.usage,
+  ts: new Date().toISOString(),
+});
+appendFileSync('.groundhog/requests.ndjson', line + '\n');
+```
+
+The routing or scope bucket is the honest one: when a request should have hit by
+our model but the usage says it did not, the miss is outside the prefix, and the
+audit says so rather than reporting a rate it invented.
 
 ## Three things it will not do
 
@@ -140,7 +203,10 @@ from.
 ## Commands
 
 ```
-groundhog doctor [file]        check a request or a captured log
+groundhog doctor [file]        one request, does it qualify to be cached
+groundhog check [file]         a set of requests, is the cacheable prefix stable
+groundhog chain [file]         a conversation, does each turn reuse the prefix
+groundhog audit <log>          real traffic, how far below the ceiling and why
 groundhog providers list       list providers in the data table
 groundhog providers show <id> [model]
 groundhog explain <code>       full write-up for a finding code
