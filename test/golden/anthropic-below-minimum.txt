@@ -1,0 +1,38 @@
+anthropic / claude-opus-5
+measured at   builder output, before any sdk normalisation
+span          338 tokens (estimate, plus or minus 12%)
+prompt        343 tokens (estimate, plus or minus 12.1%)
+minimum       4,096 tokens for this model (inferred, unverified)
+boundary      declared boundary at block 0 of 2
+
+FAIL  GH102  cacheable span is below the minimum for this model, so nothing is
+             cached
+      confidence: certain
+
+  The span is 338 tokens, at most 379 allowing for estimation error. This model
+  requires 4,096. Nothing in this request is being cached.
+
+  The API does not report an error when a span falls below the minimum. The
+  request succeeds and every token is billed in full.
+
+  The 4,096 token minimum for claude-opus-5 is recorded as "inferred" in the
+  provider data. Inferred from the Opus family pattern. Not verified for this
+  model. Override it in a groundhog.providers.json if you know better.
+
+  Fix: Add about 3,758 more tokens of stable content above the boundary, or use
+  a model with a lower minimum. Content only counts toward the minimum if it is
+  identical on every request.
+
+  Cost: 338 tokens are billed at the full input rate on every request. Price
+  data for this model is recorded as "unknown", so the amount is not shown.
+
+checks skipped
+  GH104  cacheable span is inside the provider lookback window
+         the lookback window for Anthropic is not recorded, so span length is
+         not checked against it.
+
+1 finding: 1 fail.
+This is a single request. Whether its prefix stays identical between requests is
+a separate question that one request cannot answer.
+provider data verified 2026-08-01 (today)
+Run "groundhog explain GH102" for the full write-up.

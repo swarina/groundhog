@@ -1,0 +1,17 @@
+anthropic / claude-sonnet-4-5
+measured at   builder output, before any sdk normalisation
+span          2,354 tokens (estimate, plus or minus 12%)
+prompt        2,359 tokens (estimate, plus or minus 12%)
+minimum       1,024 tokens for this model (reported, unverified)
+boundary      declared boundary at block 0 of 2
+cached        2,354 tokens billed at the cached rate
+
+ok  no problems found, and 1 check could not run
+checks skipped
+  GH104  cacheable span is inside the provider lookback window
+         the lookback window for Anthropic is not recorded, so span length is
+         not checked against it.
+
+This is a single request. Whether its prefix stays identical between requests is
+a separate question that one request cannot answer.
+provider data verified 2026-08-01 (today)

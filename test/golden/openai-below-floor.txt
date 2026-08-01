@@ -1,0 +1,54 @@
+openai / gpt-4o
+measured at   builder output, before any sdk normalisation
+span          108 tokens (estimate, plus or minus 10.2%), candidate only
+prompt        108 tokens (estimate, plus or minus 10.2%)
+minimum       1,024 tokens for this model
+boundary      provider caches the longest matching prefix, so the whole request
+              is the candidate span
+
+FAIL  GH102  cacheable span is below the minimum for this model, so nothing is
+             cached
+      confidence: certain
+
+  The span is 108 tokens, at most 120 allowing for estimation error. This model
+  requires 1,024. Nothing in this request is being cached.
+
+  The API does not report an error when a span falls below the minimum. The
+  request succeeds and every token is billed in full.
+
+  The 1,024 token minimum for gpt-4o is recorded as "documented" in the provider
+  data.
+
+  Fix: Add about 916 more tokens of stable content above the boundary, or use a
+  model with a lower minimum. Content only counts toward the minimum if it is
+  identical on every request.
+
+  Cost: 108 tokens at the full input rate on every request, 0.000270 USD instead
+  of 0.000135 USD, a difference of 0.000135 USD per request. Prices are
+  unverified.
+
+WARN  GH106  no prompt_cache_key set, so cache hits depend on which backend the
+             request reaches
+      confidence: probable
+
+  OpenAI serves cache hits only when a request reaches a backend that already
+  holds the prefix. The prompt_cache_key field influences that routing, and this
+  request does not set it.
+
+  A single request cannot show the effect. It appears as a hit rate that falls
+  as traffic grows, with no change to the prompt.
+
+  Fix: Set prompt_cache_key to a stable identifier shared by requests with the
+  same prefix, such as a prompt version or a route name. Do not use a per user
+  or per request value, since that spreads traffic rather than concentrating it.
+
+checks skipped
+  GH104  cacheable span is inside the provider lookback window
+         the lookback window for OpenAI is not recorded, so span length is not
+         checked against it.
+
+2 findings: 1 fail, 1 warn.
+This is a single request. Whether its prefix stays identical between requests is
+a separate question that one request cannot answer.
+provider data verified 2026-08-01 (today)
+Run "groundhog explain GH102" for the full write-up.

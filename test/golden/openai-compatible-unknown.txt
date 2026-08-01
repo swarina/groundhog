@@ -1,0 +1,28 @@
+openai-compatible / llama-3.3-70b-instruct
+measured at   builder output, before any sdk normalisation
+span          1,519 tokens (estimate, plus or minus 18%), candidate only
+prompt        1,519 tokens (estimate, plus or minus 18%)
+minimum       not recorded for this model, so the qualification check was
+              skipped
+boundary      caching behaviour for this endpoint is not known, so the whole
+              request is shown without a verdict
+
+ok  no problems found, and 4 checks could not run
+checks skipped
+  GH102  cacheable span meets the model minimum
+         no minimum cacheable length is recorded for llama-3.3-70b-instruct.
+         Model llama-3.3-70b-instruct is not in the provider table and there is
+         no provider wide floor.
+  GH103  cache boundary count is within the provider limit
+         the maximum number of cache boundaries for OpenAI-compatible endpoint
+         is not recorded.
+  GH104  cacheable span is inside the provider lookback window
+         the lookback window for OpenAI-compatible endpoint is not recorded, so
+         span length is not checked against it.
+  GH106  cache routing key is set
+         whether OpenAI-compatible endpoint has a cache routing key is not
+         recorded.
+
+This is a single request. Whether its prefix stays identical between requests is
+a separate question that one request cannot answer.
+provider data verified 2026-08-01 (today)
