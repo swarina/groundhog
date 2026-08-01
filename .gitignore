@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Working notes. Never commit these.
+CLAUDE.md
+DESIGN.md
+PLAN.md
+
+# Capture logs may contain prompt content. Never commit them.
+.groundhog/
