@@ -1,0 +1,451 @@
+{
+  "schemaVersion": 1,
+  "staleAfterDays": 90,
+  "providers": {
+    "anthropic": {
+      "displayName": "Anthropic",
+      "lastVerified": "2026-08-01",
+      "docs": [
+        "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"
+      ],
+      "detect": {
+        "urlPattern": "api\\.anthropic\\.com",
+        "modelPattern": "^claude-",
+        "bodyRequires": [
+          "messages"
+        ],
+        "priority": 10
+      },
+      "caching": {
+        "mode": "explicit",
+        "blockOrder": {
+          "value": [
+            "tools",
+            "system",
+            "message"
+          ],
+          "confidence": "documented",
+          "note": "Tools are hashed first, then system, then messages. A change to an earlier section invalidates every later one.",
+          "source": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"
+        },
+        "maxBreakpoints": {
+          "value": 4,
+          "confidence": "reported",
+          "source": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"
+        },
+        "cacheFloorTokens": {
+          "value": null,
+          "confidence": "unknown",
+          "note": "The minimum is model specific for this provider. See each model entry."
+        },
+        "cacheGranularityTokens": {
+          "value": null,
+          "confidence": "unknown",
+          "note": "Not documented. Assumed to be one token, but not asserted."
+        },
+        "lookbackBlocks": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "routingKeyField": {
+          "value": null,
+          "confidence": "documented",
+          "note": "This provider does not expose a routing key field."
+        },
+        "scopeDimensions": {
+          "value": [
+            "model",
+            "organisation",
+            "tools",
+            "system",
+            "tool_choice"
+          ],
+          "confidence": "inferred",
+          "note": "Derived from documented invalidation triggers. Not independently measured."
+        },
+        "ttls": [
+          {
+            "id": "5m",
+            "seconds": 300,
+            "writeMultiplier": 1.25,
+            "readMultiplier": 0.1,
+            "isDefault": true,
+            "confidence": "reported",
+            "note": "Reported to have replaced a longer default during early 2026. Sparse traffic will miss on this TTL regardless of prefix stability."
+          },
+          {
+            "id": "1h",
+            "seconds": 3600,
+            "writeMultiplier": 2,
+            "readMultiplier": 0.1,
+            "confidence": "reported"
+          }
+        ]
+      },
+      "usageFields": {
+        "input": "usage.input_tokens",
+        "cacheRead": "usage.cache_read_input_tokens",
+        "cacheWrite": "usage.cache_creation_input_tokens",
+        "output": "usage.output_tokens"
+      },
+      "tokenizer": {
+        "kind": "estimate",
+        "id": "mixture-heuristic-v1",
+        "errorBandPct": 12
+      },
+      "models": {
+        "claude-opus-5": {
+          "aliases": [
+            "claude-opus-5-*"
+          ],
+          "minCacheableTokens": {
+            "value": 4096,
+            "confidence": "inferred",
+            "note": "Inferred from the Opus family pattern. Not verified for this model."
+          },
+          "price": {
+            "value": null,
+            "confidence": "unknown"
+          }
+        },
+        "claude-sonnet-5": {
+          "aliases": [
+            "claude-sonnet-5-*"
+          ],
+          "minCacheableTokens": {
+            "value": 2048,
+            "confidence": "inferred",
+            "note": "Inferred from the Sonnet 4.6 value. Not verified for this model."
+          },
+          "price": {
+            "value": null,
+            "confidence": "unknown"
+          }
+        },
+        "claude-fable-5": {
+          "aliases": [
+            "claude-fable-5-*"
+          ],
+          "minCacheableTokens": {
+            "value": 4096,
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          },
+          "price": {
+            "value": null,
+            "confidence": "unknown"
+          }
+        },
+        "claude-haiku-4-5": {
+          "aliases": [
+            "claude-haiku-4-5-*"
+          ],
+          "minCacheableTokens": {
+            "value": 4096,
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 1,
+              "outputPer1M": 5,
+              "cachedReadPer1M": 0.1,
+              "cacheWritePer1M": 1.25
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        },
+        "claude-opus-4-5": {
+          "aliases": [
+            "claude-opus-4-5-*",
+            "claude-opus-4-6*",
+            "claude-opus-4-7*",
+            "claude-opus-4-8*"
+          ],
+          "minCacheableTokens": {
+            "value": 4096,
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 15,
+              "outputPer1M": 75,
+              "cachedReadPer1M": 1.5,
+              "cacheWritePer1M": 18.75
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        },
+        "claude-sonnet-4-6": {
+          "aliases": [
+            "claude-sonnet-4-6-*"
+          ],
+          "minCacheableTokens": {
+            "value": 2048,
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 3,
+              "outputPer1M": 15,
+              "cachedReadPer1M": 0.3,
+              "cacheWritePer1M": 3.75
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        },
+        "claude-sonnet-4-5": {
+          "aliases": [
+            "claude-sonnet-4-5-*",
+            "claude-3-7-sonnet*",
+            "claude-3-5-sonnet*"
+          ],
+          "minCacheableTokens": {
+            "value": 1024,
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 3,
+              "outputPer1M": 15,
+              "cachedReadPer1M": 0.3,
+              "cacheWritePer1M": 3.75
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        },
+        "claude-3-5-haiku": {
+          "aliases": [
+            "claude-3-5-haiku-*"
+          ],
+          "minCacheableTokens": {
+            "value": 2048,
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 0.8,
+              "outputPer1M": 4,
+              "cachedReadPer1M": 0.08,
+              "cacheWritePer1M": 1
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        }
+      }
+    },
+    "openai": {
+      "displayName": "OpenAI",
+      "lastVerified": "2026-08-01",
+      "docs": [
+        "https://developers.openai.com/api/docs/guides/prompt-caching",
+        "https://developers.openai.com/cookbook/examples/prompt_caching_201"
+      ],
+      "detect": {
+        "urlPattern": "api\\.openai\\.com",
+        "modelPattern": "^(gpt-|o[0-9]|chatgpt-|text-)",
+        "bodyRequires": [
+          "messages"
+        ],
+        "priority": 10
+      },
+      "caching": {
+        "mode": "implicit",
+        "blockOrder": {
+          "value": [
+            "tools",
+            "system",
+            "message"
+          ],
+          "confidence": "inferred",
+          "note": "Tool position within the rendered prompt is not documented. Assumed to precede messages."
+        },
+        "maxBreakpoints": {
+          "value": 0,
+          "confidence": "documented",
+          "note": "Caching is automatic. There is no breakpoint control surface."
+        },
+        "cacheFloorTokens": {
+          "value": 1024,
+          "confidence": "documented",
+          "source": "https://developers.openai.com/api/docs/guides/prompt-caching"
+        },
+        "cacheGranularityTokens": {
+          "value": 128,
+          "confidence": "documented",
+          "note": "Cached spans land on 1024, 1152, 1280 and so on. A shared prefix between two of these steps is billed at the lower step.",
+          "source": "https://developers.openai.com/api/docs/guides/prompt-caching"
+        },
+        "lookbackBlocks": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "routingKeyField": {
+          "value": "prompt_cache_key",
+          "confidence": "documented",
+          "note": "Cache hits require requests to reach the same backend. Without this field, hit rate degrades as traffic spreads across machines, with no change to the prompt.",
+          "source": "https://developers.openai.com/api/docs/guides/prompt-caching"
+        },
+        "scopeDimensions": {
+          "value": [
+            "model",
+            "organisation",
+            "tools",
+            "response_format"
+          ],
+          "confidence": "inferred"
+        },
+        "ttls": [
+          {
+            "id": "inactivity",
+            "seconds": 300,
+            "writeMultiplier": 1,
+            "readMultiplier": 0.25,
+            "isDefault": true,
+            "confidence": "reported",
+            "note": "Reported as 5 to 10 minutes of inactivity, extending to about an hour off peak. The lower bound is used so TTL findings understate rather than overstate."
+          }
+        ]
+      },
+      "usageFields": {
+        "input": "usage.prompt_tokens",
+        "cacheRead": "usage.prompt_tokens_details.cached_tokens",
+        "cacheWrite": "",
+        "output": "usage.completion_tokens"
+      },
+      "tokenizer": {
+        "kind": "estimate",
+        "id": "mixture-heuristic-v1",
+        "errorBandPct": 10
+      },
+      "models": {
+        "gpt-4o": {
+          "aliases": [
+            "gpt-4o-2*"
+          ],
+          "minCacheableTokens": {
+            "value": null,
+            "confidence": "unknown"
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 2.5,
+              "outputPer1M": 10,
+              "cachedReadPer1M": 1.25,
+              "cacheWritePer1M": 2.5
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        },
+        "gpt-4o-mini": {
+          "aliases": [
+            "gpt-4o-mini-*"
+          ],
+          "minCacheableTokens": {
+            "value": null,
+            "confidence": "unknown"
+          },
+          "price": {
+            "value": {
+              "currency": "USD",
+              "inputPer1M": 0.15,
+              "outputPer1M": 0.6,
+              "cachedReadPer1M": 0.075,
+              "cacheWritePer1M": 0.15
+            },
+            "confidence": "reported",
+            "source": "https://tokonomics.ca/blog/prompt-caching-guide-openai-anthropic",
+            "note": "From a secondary source summarising the provider documentation. Not verified against the live API."
+          }
+        }
+      }
+    },
+    "openai-compatible": {
+      "displayName": "OpenAI-compatible endpoint",
+      "lastVerified": "2026-08-01",
+      "docs": [],
+      "detect": {
+        "bodyRequires": [
+          "messages"
+        ],
+        "priority": 100
+      },
+      "caching": {
+        "mode": "unknown",
+        "blockOrder": {
+          "value": [
+            "tools",
+            "system",
+            "message"
+          ],
+          "confidence": "inferred"
+        },
+        "maxBreakpoints": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "cacheFloorTokens": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "cacheGranularityTokens": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "lookbackBlocks": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "routingKeyField": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "scopeDimensions": {
+          "value": null,
+          "confidence": "unknown"
+        },
+        "ttls": []
+      },
+      "usageFields": {
+        "input": "usage.prompt_tokens",
+        "cacheRead": "usage.prompt_tokens_details.cached_tokens",
+        "cacheWrite": "",
+        "output": "usage.completion_tokens"
+      },
+      "tokenizer": {
+        "kind": "estimate",
+        "id": "mixture-heuristic-v1",
+        "errorBandPct": 18
+      },
+      "models": {}
+    }
+  }
+}
