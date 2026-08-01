@@ -140,6 +140,8 @@ export interface Finding {
   fix: string;
   location?: Location;
   cost?: CostImpact;
+  /** Pre-rendered diff lines for the divergent span, when the finding has one. */
+  diff?: string[];
   /**
    * Set when the check could not reach a verdict, usually because a token
    * estimate band crosses a threshold or a provider fact is missing. An
@@ -269,6 +271,23 @@ export interface ProviderProfile {
     price: Fact<Price>;
   };
   loadedFrom: string[];
+}
+
+export interface StabilityReport {
+  reportVersion: 1;
+  ok: boolean;
+  certain: boolean;
+  provider: ProviderId;
+  model: string;
+  runsCompared: number;
+  axes: Array<{ label: string; description: string }>;
+  shared: {
+    tokens: TokenEstimate;
+    /** Full prefix a run carries, so the gap to the shared figure is legible. */
+    fullTokens: TokenEstimate;
+    complete: boolean;
+  };
+  findings: Finding[];
 }
 
 export interface Report {
