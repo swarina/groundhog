@@ -1,5 +1,11 @@
 export { inspectRequest, MissingModelError, type InspectOptions } from './engine/inspect.js';
+export { checkBuilderStability, checkCapturedStability } from './engine/stability.js';
+export { checkStablePrefix, expectStablePrefix, PrefixInstabilityError, type StableCheckOptions } from './assert/index.js';
+export { runMatrix, compareCanonical, type BuildFn, type MatrixOptions, type MatrixResult } from './runner/matrix.js';
+export { firstDivergence, sharedPrefix, type Divergence, type SharedPrefix } from './core/diverge.js';
+export { analysePartition, type Partition, type PartitionShape, type RunDescriptor } from './core/partition.js';
 export { renderReport, type RenderOptions } from './report/render.js';
+export { renderStabilityReport } from './report/stability.js';
 export { CATALOGUE, explain, type CatalogueEntry } from './report/catalogue.js';
 export { loadTable, resolveProfile, UnknownProviderError, type LoadOptions, type LoadedTable } from './providers/table.js';
 export { detectProvider, adapterFor, AmbiguousProviderError, type Detection } from './providers/adapters/index.js';
@@ -30,6 +36,7 @@ export type {
   Severity,
   SkippedCheck,
   SpanSummary,
+  StabilityReport,
   TokenEstimate,
   TokenizerFacts,
   TtlOption,

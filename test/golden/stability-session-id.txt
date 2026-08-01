@@ -1,0 +1,40 @@
+anthropic / claude-sonnet-4-5
+compared      2 prefixes across 1 environment
+shared prefix 1,757 tokens (estimate, plus or minus 12%), where the runs stop
+              agreeing
+full request  1,759 tokens (estimate, plus or minus 12%)
+
+FAIL  GH120  the cacheable prefix is not identical between runs
+      confidence: probable
+
+  The effective shared prefix is 1,757 tokens out of 1,759 in a full request.
+  Everything past the shared part is billed at the full rate on every request.
+
+  the prefix is identical for repeats of the same input and differs between
+  inputs, across 2 groups, which means per request data is sitting inside the
+  part meant to be shared.
+
+  The prefixes first differ at byte 6,943 of block 0 (system), after 6,943
+  shared content bytes.
+
+  These were captured requests, so the clock and random axes were not exercised.
+  Run the builder directly to test those.
+
+    ...a support agent. Answer only from the knowledge base provided below. You…
+  - 3f9a2c11
+  + 8b1d4e07
+
+  Fix: Per request data is sitting in the part meant to be shared. Move the
+  user, tenant, or session specific value out of the cached prefix and into the
+  final message.
+
+  Cost: 2 tokens at the full input rate on every request, 0.000006 USD instead
+  of 0.000001 USD, a difference of 0.000005 USD per request. Prices are
+  unverified.
+
+  Location: byte 6,943, block 0 (system)
+
+1 finding, 1 blocking.
+environments exercised
+  baseline: captured requests, compared as sent
+Run "groundhog explain GH120" for the full write-up.
