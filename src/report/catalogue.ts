@@ -1,3 +1,5 @@
+import { wrap } from './render.js';
+
 /**
  * Long form write-up for every finding code.
  *
@@ -102,7 +104,7 @@ export const CATALOGUE: Record<string, CatalogueEntry> = {
   },
 };
 
-export function explain(code: string): string {
+export function explain(code: string, width = 80): string {
   const entry = CATALOGUE[code.toUpperCase()];
   if (!entry) {
     const known = Object.keys(CATALOGUE).join(', ');
@@ -112,16 +114,16 @@ export function explain(code: string): string {
     `${entry.code}  ${entry.title}`,
     '',
     'What it means',
-    entry.what,
+    ...wrap(entry.what, width),
     '',
     'Why it matters',
-    entry.why,
+    ...wrap(entry.why, width),
     '',
     'How to fix it',
-    entry.fix,
+    ...wrap(entry.fix, width),
     '',
     'Situations that produce it',
-    ...entry.detects.map((item) => `  ${item}`),
+    ...entry.detects.flatMap((item) => wrap(item, width - 2).map((line) => `  ${line}`)),
     '',
   ].join('\n');
 }
