@@ -45,7 +45,7 @@ describe('prefix serialisation', () => {
     const second = serialised.map.find((entry) => entry.blockIndex === 1);
     expect(second).toBeDefined();
 
-    const located = locate(serialised.map, (second as { start: number }).start + 3);
+    const located = locate(serialised.map, (second?.payloadStart ?? 0) + 3);
     expect(located?.blockIndex).toBe(1);
     expect(located?.partIndex).toBe(0);
   });
@@ -56,7 +56,16 @@ describe('prefix serialisation', () => {
     const first = serialised.map[0];
     expect(first).toBeDefined();
     // Five bytes for four characters, because the accented character takes two.
-    expect((first as { end: number; start: number }).end - (first as { start: number }).start).toBe(5);
+    expect((first?.payloadEnd ?? 0) - (first?.payloadStart ?? 0)).toBe(5);
+  });
+
+  it('separates the framing of a part from its content', () => {
+    // The payload range is what an offset is reported against, so it must not
+    // include the tag byte or the length prefix.
+    const serialised = serializePrefix([textBlock(0, 'hello')]);
+    const entry = serialised.map[0];
+    expect(entry?.spanStart).toBeLessThan(entry?.payloadStart ?? 0);
+    expect(entry?.spanEnd).toBe(entry?.payloadEnd);
   });
 
   it('builds a hash chain where each entry covers every block up to that point', () => {
@@ -85,6 +94,11 @@ describe('prefix serialisation', () => {
       { index: 0, kind: 'message', role: 'user', parts: [{ type: 'binary', sha256: 'b'.repeat(64), byteLength: 1024, mime: 'image/png' }] },
     ];
     expect(prefixHash(withImage)).not.toBe(prefixHash(changed));
-    expect(serializePrefix(withImage).map).toHaveLength(0);
+
+    // The stream carries the digest and never the content, so an image cannot
+    // be reconstructed from a prefix and can never reach a terminal.
+    const serialised = serializePrefix(withImage);
+    expect(serialised.bytes.toString('utf8')).toContain('a'.repeat(64));
+    expect(serialised.map[0]?.type).toBe('binary');
   });
 });
