@@ -245,6 +245,12 @@ export interface UsageFields {
   cacheRead: string;
   cacheWrite: string;
   output: string;
+  /**
+   * True when the input field already counts the cached tokens, as OpenAI's
+   * prompt_tokens does, and false when it counts only the uncached remainder,
+   * as Anthropic's input_tokens does. This decides how usage is normalised.
+   */
+  inputIncludesCached: boolean;
 }
 
 export interface TokenizerFacts {
