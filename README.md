@@ -160,6 +160,32 @@ The routing or scope bucket is the honest one: when a request should have hit by
 our model but the usage says it did not, the miss is outside the prefix, and the
 audit says so rather than reporting a rate it invented.
 
+## Catching the deploy that cold starts the cache
+
+A prompt edit shipped on a deploy invalidates every cached prefix at once, and
+nothing reports it. Commit a baseline hash beside the code, and a change to the
+cached prefix becomes a one line diff in review.
+
+```bash
+groundhog baseline request.json --model claude-sonnet-4-5   # records the hash
+git add .groundhog/baseline.json                            # commit it
+
+groundhog baseline request.json --model claude-sonnet-4-5 --check   # fails on drift
+```
+
+When the check fails, `groundhog blame` walks the lockfile's git history and
+names the commit that changed it:
+
+```
+prompt
+  current  9c9aeb0bbf76, 750 tokens
+  changed  8b10152a246c on 2026-08-01, "add source citations to the system prompt"
+  from     c23334ef9c95
+```
+
+That turns "our costs jumped last month and nobody knows why" into one command.
+Accept an intended change with `--update`.
+
 ## Three things it will not do
 
 **It will not report a pass it cannot support.** Token counts are estimates with
@@ -207,6 +233,8 @@ groundhog doctor [file]        one request, does it qualify to be cached
 groundhog check [file]         a set of requests, is the cacheable prefix stable
 groundhog chain [file]         a conversation, does each turn reuse the prefix
 groundhog audit <log>          real traffic, how far below the ceiling and why
+groundhog baseline <file>      record or check the prefix hash against a lockfile
+groundhog blame                show which commit changed the cached prefix
 groundhog providers list       list providers in the data table
 groundhog providers show <id> [model]
 groundhog explain <code>       full write-up for a finding code
