@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { formatCount } from '../core/format.js';
 import { inspectRequest, type InspectOptions } from '../engine/inspect.js';
@@ -16,6 +16,12 @@ import {
   type BaselineEntry,
 } from '../baseline/lockfile.js';
 import { blame, NotAGitRepoError } from '../baseline/blame.js';
+import { buildProbes } from '../conformance/probes.js';
+import { shaperFor } from '../conformance/shapers.js';
+import { runProbes, planRun } from '../conformance/runner.js';
+import { buildPatch, hasObservations } from '../conformance/patch.js';
+import { httpSender } from '../conformance/http.js';
+import { renderConformance } from '../report/conformance.js';
 import { adapterFor, detectProvider } from '../providers/adapters/index.js';
 import { loadTable, resolveProfile } from '../providers/table.js';
 import { explain } from '../report/catalogue.js';
@@ -37,6 +43,7 @@ usage
   groundhog audit <log>          decompose cache loss over a log of real requests
   groundhog baseline <file>      record or check the prefix hash against a lockfile
   groundhog blame                show which commit changed the cached prefix
+  groundhog conformance run      measure a provider against its live api
   groundhog providers list       list providers in the data table
   groundhog providers show <id> [model]
   groundhog explain <code>       full write-up for a finding code
@@ -68,7 +75,7 @@ exit codes
   3  a check reached no verdict and --strict was set
 `;
 
-function main(argv: string[]): number {
+async function main(argv: string[]): Promise<number> {
   let parsed: ParsedArgs;
   try {
     parsed = parseArgs(argv);
@@ -96,6 +103,8 @@ function main(argv: string[]): number {
         return runBaseline(parsed);
       case 'blame':
         return runBlame(parsed);
+      case 'conformance':
+        return await runConformance(parsed);
       case 'providers':
         return runProviders(parsed);
       case 'explain':
@@ -472,6 +481,73 @@ function runBlame(parsed: ParsedArgs): number {
   return 0;
 }
 
+async function runConformance(parsed: ParsedArgs): Promise<number> {
+  if (parsed.positionals[0] !== 'run') {
+    process.stdout.write(
+      'conformance measures a provider against its live api, so a table value can be "observed" rather than "reported".\n\n' +
+        'usage\n' +
+        '  groundhog conformance run --provider anthropic --model claude-sonnet-4-5 --yes\n\n' +
+        'It needs an api key in GROUNDHOG_API_KEY and it sends real, billable requests, so it will not run\n' +
+        'without --yes. Without --yes it prints the plan and sends nothing.\n',
+    );
+    return parsed.positionals[0] == null ? 0 : 2;
+  }
+
+  const provider = stringFlag(parsed.flags, 'provider');
+  const model = stringFlag(parsed.flags, 'model');
+  if (!provider || !model) {
+    process.stderr.write('conformance run needs --provider and --model.\n');
+    return 2;
+  }
+
+  const loaded = loadTable(stringFlag(parsed.flags, 'provider-table') ? { table: stringFlag(parsed.flags, 'provider-table') } : {});
+  const profile = resolveProfile(loaded, provider, model);
+  const probes = buildProbes(shaperFor(provider, model));
+  const plan = planRun(probes);
+
+  process.stdout.write(
+    `conformance run for ${provider} / ${model}\n` +
+      `  ${formatCount(probes.length)} probes, about ${formatCount(plan.totalRequests)} requests` +
+      (plan.maxWaitSeconds > 0 ? `, up to ${formatCount(plan.maxWaitSeconds / 60)} minutes of waiting` : '') +
+      '\n  these are real, billable requests to the provider\n\n',
+  );
+
+  if (!boolFlag(parsed.flags, 'yes')) {
+    process.stdout.write('This was a dry run. Nothing was sent. Add --yes to run it for real.\n');
+    return 0;
+  }
+
+  const apiKey = process.env['GROUNDHOG_API_KEY'];
+  if (!apiKey) {
+    process.stderr.write('No api key. Set GROUNDHOG_API_KEY to the key for this provider and run again.\n');
+    return 2;
+  }
+
+  const sender = httpSender(profile, apiKey);
+  const runs = await runProbes(probes, sender, {
+    onStep: (id, label, index, total) => process.stderr.write(`  ${id}: ${label} (${index + 1}/${total})\n`),
+  });
+
+  process.stdout.write('\n' + renderConformance(runs, provider, model, { color: shouldColor(parsed), width: 80 }));
+
+  if (!hasObservations(runs)) {
+    process.stdout.write('No probe produced a value to record.\n');
+    return 0;
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  const patch = buildPatch(runs, { provider, model, date });
+  const out = stringFlag(parsed.flags, 'name');
+  if (out) {
+    writeFileSync(out, JSON.stringify(patch, null, 2) + '\n');
+    process.stdout.write(`\nWrote the measured values to ${out}. Review it, then use it as a groundhog.providers.json.\n`);
+  } else {
+    process.stdout.write('\nMeasured values, save this as a groundhog.providers.json to use them:\n\n');
+    process.stdout.write(JSON.stringify(patch, null, 2) + '\n');
+  }
+  return 0;
+}
+
 function runProviders(parsed: ParsedArgs): number {
   const tablePath = stringFlag(parsed.flags, 'provider-table');
   const loaded = loadTable(tablePath ? { table: tablePath } : {});
@@ -545,4 +621,6 @@ function shouldColor(parsed: ParsedArgs): boolean {
   return process.stdout.isTTY === true;
 }
 
-process.exitCode = main(process.argv.slice(2));
+void main(process.argv.slice(2)).then((code) => {
+  process.exitCode = code;
+});

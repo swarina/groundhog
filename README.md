@@ -186,6 +186,25 @@ prompt
 That turns "our costs jumped last month and nobody knows why" into one command.
 Accept an intended change with `--update`.
 
+## Measuring a provider instead of trusting its docs
+
+Provider caching rules are often documented loosely and change without notice.
+The conformance suite sends designed requests to a real endpoint and reads the
+cache usage back, so a table value can carry the confidence `observed` with a
+date rather than `reported` from a blog post.
+
+```bash
+groundhog conformance run --provider anthropic --model claude-sonnet-4-5   # dry run
+GROUNDHOG_API_KEY=... groundhog conformance run --provider anthropic --model claude-sonnet-4-5 --yes
+```
+
+It measures the real minimum cacheable length, whether trailing whitespace
+breaks the match, and whether tool order participates in the cache key. It is
+the only part of the tool that touches a provider, it sends real billable
+requests, and it will not run without `--yes`. The output is a
+`groundhog.providers.json` fragment of what it measured, for you to review and
+keep.
+
 ## Three things it will not do
 
 **It will not report a pass it cannot support.** Token counts are estimates with
@@ -195,7 +214,9 @@ an error band. When the band crosses a threshold the answer is "no verdict", not
 **It will not guess a provider fact.** Every threshold, limit, price and field
 name lives in `data/providers.json` with a confidence level, a source and a
 verification date. When a fact is unknown the check that needs it is skipped and
-named, never run against a value borrowed from a similar provider.
+named, never run against a value borrowed from a similar provider. Values marked
+`reported` came from documentation and are not yet verified; the conformance
+suite below turns them into `observed`.
 
 **It will not go on the hot path.** There is no proxy and no gateway. The
 recorder patches fetch inside your test process and nowhere else.

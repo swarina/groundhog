@@ -17,6 +17,12 @@ export {
   type DriftResult,
 } from './baseline/lockfile.js';
 export { blame, NotAGitRepoError, type BlameResult, type Commit } from './baseline/blame.js';
+export { buildProbes, worksAtAll, threshold, whitespaceSignificance, toolOrder, fillerForTokens, type RequestShaper } from './conformance/probes.js';
+export { shaperFor, anthropicShaper, openaiShaper } from './conformance/shapers.js';
+export { runProbe, runProbes, planRun, type RunOptions, type Sleep, type RunPlan } from './conformance/runner.js';
+export { buildPatch, hasObservations } from './conformance/patch.js';
+export { httpSender, ConformanceRequestError } from './conformance/http.js';
+export type { Probe, ProbeRun, ProbeStep, Observation, Conclusion, Sender, SendResult } from './conformance/types.js';
 export { renderAudit, renderAuditResult } from './report/audit.js';
 export type { AuditRecord, NormalisedUsage } from './audit/types.js';
 export { checkStablePrefix, expectStablePrefix, PrefixInstabilityError, type StableCheckOptions } from './assert/index.js';
