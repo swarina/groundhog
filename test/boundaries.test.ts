@@ -89,4 +89,13 @@ describe('writing rules', () => {
     const text = readFileSync(join(ROOT, 'data', 'providers.json'), 'utf8');
     expect(text).not.toMatch(/[–—]/);
   });
+
+  it('writes control characters as escapes rather than as literal bytes', () => {
+    // Escape sequences and control bytes both work, and only one of them can be
+    // read in a diff or a review.
+    const control = new RegExp('[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]');
+    for (const file of FILES) {
+      expect(readFileSync(file.path, 'utf8'), `${file.rel} contains a literal control character`).not.toMatch(control);
+    }
+  });
 });
