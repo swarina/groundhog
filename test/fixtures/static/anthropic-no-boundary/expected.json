@@ -1,0 +1,9 @@
+{
+  "note": "A large, perfectly stable system prompt with no cache control marker. Nothing is cached and the API reports no error.",
+  "model": "claude-opus-5",
+  "ok": false,
+  "certain": true,
+  "codes": ["GH101"],
+  "notCodes": ["GH102", "GH103"],
+  "skipped": ["GH104"]
+}

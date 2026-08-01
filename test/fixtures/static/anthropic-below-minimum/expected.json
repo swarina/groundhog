@@ -1,0 +1,8 @@
+{
+  "note": "Caching is set up correctly and the span is far too short to qualify for this model. Silent, and total.",
+  "model": "claude-opus-5",
+  "ok": false,
+  "certain": true,
+  "codes": ["GH102"],
+  "notCodes": ["GH101", "GH103"]
+}

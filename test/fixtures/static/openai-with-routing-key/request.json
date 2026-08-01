@@ -1,0 +1,8 @@
+{
+  "model": "gpt-4o",
+  "prompt_cache_key": "support-agent-v4",
+  "messages": [
+    { "role": "system", "content": { "$filler": { "words": 1200 } } },
+    { "role": "user", "content": "where is my order" }
+  ]
+}

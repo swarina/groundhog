@@ -1,0 +1,8 @@
+{
+  "note": "Negative case. Everything is set up correctly, so no detector may fire.",
+  "model": "claude-sonnet-4-5",
+  "ok": true,
+  "certain": true,
+  "codes": [],
+  "notCodes": ["GH101", "GH102", "GH103", "GH105", "GH106", "GH110"]
+}

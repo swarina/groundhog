@@ -1,0 +1,10 @@
+{
+  "model": "claude-opus-5",
+  "max_tokens": 1024,
+  "system": [
+    { "type": "text", "text": { "$filler": { "words": 200 } }, "cache_control": { "type": "ephemeral" } }
+  ],
+  "messages": [
+    { "role": "user", "content": "where is my order" }
+  ]
+}

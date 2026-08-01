@@ -1,0 +1,9 @@
+{
+  "note": "An endpoint whose caching behaviour is not recorded. Every threshold check must be skipped and named, never guessed from a similar provider.",
+  "model": "llama-3.3-70b-instruct",
+  "ok": true,
+  "certain": true,
+  "codes": [],
+  "notCodes": ["GH101", "GH102", "GH103", "GH105", "GH106"],
+  "skipped": ["GH102", "GH103", "GH104", "GH106"]
+}

@@ -1,0 +1,8 @@
+{
+  "note": "Short prompt on a provider with a floor. Caching is automatic and cannot engage at all.",
+  "model": "gpt-4o",
+  "ok": false,
+  "certain": true,
+  "codes": ["GH102", "GH106"],
+  "notCodes": ["GH101", "GH105"]
+}

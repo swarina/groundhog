@@ -1,0 +1,8 @@
+{
+  "note": "Five boundaries against a limit of four. The fifth is not honoured and nothing says so.",
+  "model": "claude-sonnet-4-5",
+  "ok": false,
+  "certain": true,
+  "codes": ["GH103"],
+  "notCodes": ["GH101", "GH102"]
+}

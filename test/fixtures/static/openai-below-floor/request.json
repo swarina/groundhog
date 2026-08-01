@@ -1,0 +1,7 @@
+{
+  "model": "gpt-4o",
+  "messages": [
+    { "role": "system", "content": { "$filler": { "words": 60 } } },
+    { "role": "user", "content": "where is my order" }
+  ]
+}

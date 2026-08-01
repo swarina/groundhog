@@ -1,0 +1,8 @@
+{
+  "note": "Negative case for the routing key detector. A key is set, so it must not fire.",
+  "model": "gpt-4o",
+  "ok": true,
+  "certain": true,
+  "codes": [],
+  "notCodes": ["GH101", "GH102", "GH106"]
+}
