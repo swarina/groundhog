@@ -1,6 +1,9 @@
 export { inspectRequest, MissingModelError, type InspectOptions } from './engine/inspect.js';
 export { checkBuilderStability, checkCapturedStability } from './engine/stability.js';
+export { checkChain } from './engine/chain.js';
 export { checkStablePrefix, expectStablePrefix, PrefixInstabilityError, type StableCheckOptions } from './assert/index.js';
+export { checkPrefixChainOf, expectPrefixChain, BrokenChainError, type ChainCheckOptions } from './assert/chain.js';
+export { renderChainReport } from './report/chain.js';
 export { runMatrix, compareCanonical, type BuildFn, type MatrixOptions, type MatrixResult } from './runner/matrix.js';
 export { firstDivergence, sharedPrefix, type Divergence, type SharedPrefix } from './core/diverge.js';
 export { analysePartition, type Partition, type PartitionShape, type RunDescriptor } from './core/partition.js';
@@ -20,6 +23,8 @@ export type {
   CachingFacts,
   CanonicalPrefix,
   CanonicalRequest,
+  ChainReport,
+  ChainStep,
   Confidence,
   CostImpact,
   Fact,

@@ -114,6 +114,29 @@ export const CATALOGUE: Record<string, CatalogueEntry> = {
     ],
   },
 
+  GH130: {
+    code: 'GH130',
+    title: 'The conversation stops reusing its prefix',
+    what:
+      'In a multi turn conversation, a turn was not a byte for byte extension of the turn before it. It re-rendered ' +
+      'content that the earlier turn already sent, so the provider could reuse only part of the prior context.',
+    why:
+      'An agent loop sends the whole conversation every turn, and the cache pays only when each turn extends the last ' +
+      'one exactly. When an earlier turn is rebuilt on replay, the match breaks at that point, and from there on every ' +
+      'turn pays full price on a context that keeps growing. This is where the largest cache bills come from, and it is ' +
+      'invisible: the responses are normal and only the bill moves.',
+    fix:
+      'Carry earlier turns forward verbatim rather than rebuilding them from parsed state. The usual causes are a tool ' +
+      'result serialised differently on replay, an assistant message normalised on the way back in, a history summarised ' +
+      'in place, or tool definitions rebuilt from a registry in a different order.',
+    detects: [
+      'a tool result re-serialised differently the second time it is sent',
+      'an assistant message normalised when read back into the history',
+      'conversation history summarised or truncated in place',
+      'tool definitions rebuilt per turn in an unstable order',
+    ],
+  },
+
   GH110: {
     code: 'GH110',
     title: 'Provider data is out of date',
