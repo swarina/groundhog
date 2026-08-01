@@ -45,7 +45,7 @@ describe('prefix serialisation', () => {
     const second = serialised.map.find((entry) => entry.blockIndex === 1);
     expect(second).toBeDefined();
 
-    const located = locate(serialised.map, (second?.payloadStart ?? 0) + 3);
+    const located = locate(serialised.map, (second?.start ?? 0) + 3);
     expect(located?.blockIndex).toBe(1);
     expect(located?.partIndex).toBe(0);
   });
@@ -56,16 +56,16 @@ describe('prefix serialisation', () => {
     const first = serialised.map[0];
     expect(first).toBeDefined();
     // Five bytes for four characters, because the accented character takes two.
-    expect((first?.payloadEnd ?? 0) - (first?.payloadStart ?? 0)).toBe(5);
+    expect((first?.end ?? 0) - (first?.start ?? 0)).toBe(5);
   });
 
-  it('separates the framing of a part from its content', () => {
-    // The payload range is what an offset is reported against, so it must not
-    // include the tag byte or the length prefix.
+  it('maps to content rather than to framing', () => {
+    // The recorded range must exclude the tag byte and the length prefix, so an
+    // offset located through the map lands in the user's content.
     const serialised = serializePrefix([textBlock(0, 'hello')]);
     const entry = serialised.map[0];
-    expect(entry?.spanStart).toBeLessThan(entry?.payloadStart ?? 0);
-    expect(entry?.spanEnd).toBe(entry?.payloadEnd);
+    expect(entry?.start).toBeGreaterThan(0);
+    expect(serialised.bytes.subarray(entry?.start, entry?.end).toString('utf8')).toBe('hello');
   });
 
   it('builds a hash chain where each entry covers every block up to that point', () => {

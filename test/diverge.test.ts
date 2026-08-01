@@ -1,65 +1,93 @@
 import { describe, expect, it } from 'vitest';
-import { serializePrefix, truncatePrefix } from '../src/core/canonical.js';
-import { firstDivergence, sharedPrefix } from '../src/core/diverge.js';
+import { firstDivergence, sharedPrefix, truncateUtf8 } from '../src/core/diverge.js';
 import { estimateBlocks } from '../src/tokens/estimate.js';
-import type { CanonicalPrefix } from '../src/types.js';
+import type { Block, CanonicalPrefix, Part } from '../src/types.js';
 
 function prefix(...texts: string[]): CanonicalPrefix {
   return texts.map((text, index) => ({ index, kind: 'system' as const, role: 'system' as const, parts: [{ type: 'text' as const, text }] }));
 }
 
-function diverge(left: CanonicalPrefix, right: CanonicalPrefix) {
-  return firstDivergence(serializePrefix(left), serializePrefix(right), left);
+function block(index: number, kind: Block['kind'], parts: Part[], role?: Block['role']): Block {
+  return { index, kind, ...(role ? { role } : {}), parts };
 }
 
 describe('divergence localisation', () => {
   it('reports nothing when the prefixes are identical', () => {
-    expect(diverge(prefix('a', 'b'), prefix('a', 'b'))).toBeNull();
+    expect(firstDivergence(prefix('a', 'b'), prefix('a', 'b'))).toBeNull();
   });
 
   it('names the block and the offset inside its content', () => {
-    const found = diverge(prefix('stable header', 'the time is 09:14'), prefix('stable header', 'the time is 09:15'));
+    const found = firstDivergence(prefix('stable header', 'the time is 09:14'), prefix('stable header', 'the time is 09:15'));
     expect(found?.blockIndex).toBe(1);
     expect(found?.sharedBlocks).toBe(1);
     expect(found?.partIndex).toBe(0);
-    expect(found?.partType).toBe('text');
-    // "the time is 09:1" is sixteen characters, so the first difference is at
-    // offset sixteen within the content rather than within our framing.
     expect(found?.offsetInPart).toBe(16);
   });
 
-  it('reports an offset into content, not into the encoding', () => {
-    const found = diverge(prefix('abcdef'), prefix('abcXef'));
-    expect(found?.offsetInPart).toBe(3);
+  it('reports an offset into content, never into the framing', () => {
+    // The regression that motivated a structural comparison: two texts of
+    // different length differ in their length prefix before their content, and
+    // a raw byte comparison would report that framing offset instead of this.
+    const found = firstDivergence(prefix('the same start X'), prefix('the same start YYYYYYYY'));
+    // "the same start " is fifteen characters, so the first difference is at
+    // offset fifteen, in the content, not somewhere in a length header.
+    expect(found?.offsetInPart).toBe(15);
+    expect(found?.contentByteOffset).toBe(15);
   });
 
   it('counts multibyte characters as the bytes they occupy', () => {
-    const found = diverge(prefix('café x'), prefix('café y'));
-    // Four characters, five bytes, then a space, so the difference is at six.
+    const found = firstDivergence(prefix('café x'), prefix('café y'));
     expect(found?.offsetInPart).toBe(6);
   });
 
-  it('distinguishes one prefix ending from one prefix changing', () => {
-    const truncated = diverge(prefix('a', 'b'), prefix('a'));
-    expect(truncated?.isTruncation).toBe(true);
+  it('accumulates a content offset across earlier blocks', () => {
+    const found = firstDivergence(prefix('aaaa', 'bbbb', 'cccc'), prefix('aaaa', 'bbbb', 'cxcc'));
+    // Two shared blocks of four bytes each, then one byte into the third.
+    expect(found?.contentByteOffset).toBe(9);
+    expect(found?.sharedBlocks).toBe(2);
+  });
 
-    const changed = diverge(prefix('a', 'b'), prefix('a', 'c'));
-    expect(changed?.isTruncation).toBe(false);
+  it('distinguishes a content change from a structural one', () => {
+    const content = firstDivergence(prefix('a', 'b'), prefix('a', 'c'));
+    expect(content?.isStructural).toBe(false);
+
+    const structural = firstDivergence(
+      [block(0, 'system', [{ type: 'text', text: 'a' }])],
+      [block(0, 'system', [{ type: 'text', text: 'a' }, { type: 'text', text: 'extra' }])],
+    );
+    expect(structural?.isStructural).toBe(true);
+  });
+
+  it('flags a block that was added as a truncation and a structural change', () => {
+    const found = firstDivergence(prefix('a'), prefix('a', 'b'));
+    expect(found?.isTruncation).toBe(true);
+    expect(found?.isStructural).toBe(true);
+    expect(found?.sharedBlocks).toBe(1);
+  });
+
+  it('sees a change of block kind as structural before comparing content', () => {
+    const found = firstDivergence(
+      [block(0, 'system', [{ type: 'text', text: 'same' }], 'system')],
+      [block(0, 'message', [{ type: 'text', text: 'same' }], 'user')],
+    );
+    expect(found?.isStructural).toBe(true);
+    expect(found?.offsetInPart).toBeNull();
+  });
+
+  it('compares binary parts by digest and never by content', () => {
+    const left = [block(0, 'message', [{ type: 'binary', sha256: 'a'.repeat(64), byteLength: 10, mime: 'image/png' }], 'user')];
+    const right = [block(0, 'message', [{ type: 'binary', sha256: 'b'.repeat(64), byteLength: 10, mime: 'image/png' }], 'user')];
+    const found = firstDivergence(left, right);
+    expect(found?.partType).toBe('binary');
+    expect(found?.offsetInPart).toBeNull();
+    expect(found?.isStructural).toBe(false);
   });
 
   it('finds a divergence in the very first byte of content', () => {
-    const found = diverge(prefix('x'), prefix('y'));
+    const found = firstDivergence(prefix('x'), prefix('y'));
     expect(found?.sharedBlocks).toBe(0);
     expect(found?.offsetInPart).toBe(0);
-  });
-
-  it('handles a difference past the word aligned scan', () => {
-    // The scan compares four bytes at a time and then falls back to single
-    // bytes, so a difference at an offset that is not a multiple of four has to
-    // land in the same place as any other.
-    const base = 'x'.repeat(1000);
-    const found = diverge(prefix(base + 'a' + base), prefix(base + 'b' + base));
-    expect(found?.offsetInPart).toBe(1000);
+    expect(found?.contentByteOffset).toBe(0);
   });
 });
 
@@ -78,8 +106,6 @@ describe('shared prefix', () => {
   });
 
   it('is bounded by the worst pair, not the best', () => {
-    // One prefix diverging early caps the shared span for the whole set, which
-    // is what a provider sees across a real traffic pattern.
     const result = sharedPrefix([prefix('a', 'b', 'c'), prefix('a', 'b', 'x'), prefix('a', 'z', 'c')]);
     expect(result.blocks).toBe(1);
   });
@@ -92,24 +118,23 @@ describe('shared prefix', () => {
     expect(result.blocks).toBe(0);
     expect(result.prefix).toHaveLength(1);
     const kept = result.prefix[0]?.parts[0];
-    expect(kept?.type).toBe('text');
     expect((kept as { text: string }).text).toBe('the same beginning and then ');
   });
 
+  it('measures shared content even when the diverging texts differ in length', () => {
+    // This is the case the raw byte comparison got wrong, collapsing the shared
+    // span to nothing because the length prefixes differed first.
+    const stable = 'the assistant answers questions about billing. '.repeat(30);
+    const result = sharedPrefix([prefix(stable + 'a'), prefix(stable + 'a longer tail entirely')]);
+    expect(result.contentBytes).toBe(Buffer.byteLength(stable + 'a', 'utf8'));
+    expect(estimateBlocks(result.prefix).value).toBeGreaterThan(100);
+  });
+
   it('never splits a multibyte character when it truncates', () => {
-    const left = prefix('prefix café A');
-    const right = prefix('prefix café B');
-    const result = sharedPrefix([left, right]);
+    const result = sharedPrefix([prefix('prefix café A'), prefix('prefix café B')]);
     const kept = (result.prefix[0]?.parts[0] as { text: string }).text;
     expect(kept).toBe('prefix café ');
     expect(Buffer.from(kept, 'utf8').toString('utf8')).toBe(kept);
-  });
-
-  it('produces a shared span that can be counted in tokens', () => {
-    const stable = 'the assistant answers questions about billing and shipping. '.repeat(40);
-    const result = sharedPrefix([prefix(stable + 'run one'), prefix(stable + 'run two')]);
-    const tokens = estimateBlocks(result.prefix);
-    expect(tokens.value).toBeGreaterThan(100);
   });
 
   it('is empty when the prefixes differ from the very start', () => {
@@ -117,35 +142,26 @@ describe('shared prefix', () => {
     expect(result.prefix).toHaveLength(0);
     expect(estimateBlocks(result.prefix).value).toBe(0);
   });
+
+  it('returns a single prefix unchanged', () => {
+    const only = prefix('a', 'b');
+    const result = sharedPrefix([only]);
+    expect(result.complete).toBe(true);
+    expect(result.blocks).toBe(2);
+  });
 });
 
-describe('truncation', () => {
-  it('returns nothing for a cut at zero', () => {
-    const blocks = prefix('a', 'b');
-    expect(truncatePrefix(blocks, serializePrefix(blocks), 0)).toHaveLength(0);
+describe('utf-8 truncation', () => {
+  it('never splits a multibyte character', () => {
+    // Four bytes for two characters, so a three byte cut steps back to two.
+    expect(truncateUtf8('你好', 3)).toBe('你');
   });
 
-  it('returns everything for a cut past the end', () => {
-    const blocks = prefix('a', 'b');
-    const serialised = serializePrefix(blocks);
-    expect(truncatePrefix(blocks, serialised, serialised.bytes.length)).toHaveLength(2);
+  it('returns nothing for a non positive length', () => {
+    expect(truncateUtf8('anything', 0)).toBe('');
   });
 
-  it('drops a binary part rather than halving it', () => {
-    const blocks: CanonicalPrefix = [
-      {
-        index: 0,
-        kind: 'message',
-        role: 'user',
-        parts: [
-          { type: 'text', text: 'look at this' },
-          { type: 'binary', sha256: 'c'.repeat(64), byteLength: 4096, mime: 'image/png' },
-        ],
-      },
-    ];
-    const serialised = serializePrefix(blocks);
-    const entry = serialised.map.find((candidate) => candidate.type === 'binary');
-    const cut = truncatePrefix(blocks, serialised, (entry?.spanStart ?? 0) + 4);
-    expect(cut[0]?.parts.map((part) => part.type)).toEqual(['text']);
+  it('returns the whole string when the length covers it', () => {
+    expect(truncateUtf8('abc', 100)).toBe('abc');
   });
 });

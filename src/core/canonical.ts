@@ -14,16 +14,9 @@ export interface OffsetEntry {
   blockIndex: number;
   partIndex: number;
   type: Part['type'];
-  /** Full encoded extent of the part, including its tag and length prefix. */
-  spanStart: number;
-  spanEnd: number;
-  /**
-   * Extent of the content itself. Mapping a divergence offset to a position
-   * inside a piece of text uses this, so the reported offset is an offset into
-   * the user's content rather than into our framing.
-   */
-  payloadStart: number;
-  payloadEnd: number;
+  /** Byte range of the part's content in the serialised stream, excluding framing. */
+  start: number;
+  end: number;
 }
 
 export interface SerializedPrefix {
@@ -91,28 +84,28 @@ class ByteWriter {
 }
 
 function writePart(w: ByteWriter, part: Part, blockIndex: number, partIndex: number, map: OffsetEntry[]): void {
-  const spanStart = w.offset;
   switch (part.type) {
     case 'text': {
       w.byte(TAG_TEXT);
       const range = w.string(part.text);
-      map.push({ blockIndex, partIndex, type: 'text', spanStart, spanEnd: w.offset, payloadStart: range.start, payloadEnd: range.end });
+      map.push({ blockIndex, partIndex, type: 'text', start: range.start, end: range.end });
       return;
     }
     case 'json': {
       w.byte(TAG_JSON);
       const range = w.string(part.canonical);
-      map.push({ blockIndex, partIndex, type: 'json', spanStart, spanEnd: w.offset, payloadStart: range.start, payloadEnd: range.end });
+      map.push({ blockIndex, partIndex, type: 'json', start: range.start, end: range.end });
       return;
     }
     case 'binary': {
       // Binary content is never compared byte by byte. It is represented by its
       // digest so a change is detectable and reportable without dumping bytes.
+      const start = w.offset;
       w.byte(TAG_BINARY);
       w.string(part.sha256);
       w.varint(part.byteLength);
       w.string(part.mime);
-      map.push({ blockIndex, partIndex, type: 'binary', spanStart, spanEnd: w.offset, payloadStart: spanStart, payloadEnd: w.offset });
+      map.push({ blockIndex, partIndex, type: 'binary', start, end: w.offset });
       return;
     }
   }
@@ -146,13 +139,7 @@ export function serializePrefix(blocks: CanonicalPrefix): SerializedPrefix {
 
     const bytes = w.concat();
     for (const entry of blockMap) {
-      map.push({
-        ...entry,
-        spanStart: entry.spanStart + base,
-        spanEnd: entry.spanEnd + base,
-        payloadStart: entry.payloadStart + base,
-        payloadEnd: entry.payloadEnd + base,
-      });
+      map.push({ ...entry, start: entry.start + base, end: entry.end + base });
     }
     buffers.push(bytes);
     blockBytes.push(bytes.length);
@@ -172,76 +159,11 @@ export function prefixHash(blocks: CanonicalPrefix): string {
 /** Maps a byte offset in the serialised stream back to a block and part. */
 export function locate(map: OffsetEntry[], byteOffset: number): OffsetEntry | null {
   for (const entry of map) {
-    if (byteOffset >= entry.spanStart && byteOffset < entry.spanEnd) return entry;
+    if (byteOffset >= entry.start && byteOffset < entry.end) return entry;
   }
   return null;
 }
 
-/**
- * Cuts a prefix down to the content that precedes a byte offset.
- *
- * This is what turns a divergence offset into a measurable shared span. Parts
- * that end before the cut survive whole, the part straddling it is truncated,
- * and everything after is dropped. Binary parts are dropped rather than
- * truncated, because half an image is not a smaller image.
- */
-export function truncatePrefix(blocks: CanonicalPrefix, serialised: SerializedPrefix, byteOffset: number): CanonicalPrefix {
-  if (byteOffset <= 0) return [];
-
-  const out: Block[] = [];
-  let blockStart = 0;
-
-  for (let i = 0; i < blocks.length; i += 1) {
-    const block = blocks[i];
-    const blockLength = serialised.blockBytes[i] ?? 0;
-    if (!block) break;
-    const blockEnd = blockStart + blockLength;
-
-    if (blockEnd <= byteOffset) {
-      out.push(block);
-      blockStart = blockEnd;
-      continue;
-    }
-
-    // The block straddling the cut keeps whatever parts finish before it.
-    const parts: Part[] = [];
-    for (const entry of serialised.map) {
-      if (entry.blockIndex !== block.index) continue;
-      const part = block.parts[entry.partIndex];
-      if (!part) continue;
-
-      if (entry.spanEnd <= byteOffset) {
-        parts.push(part);
-        continue;
-      }
-      if (entry.payloadStart >= byteOffset || part.type === 'binary') break;
-
-      const text = part.type === 'text' ? part.text : part.canonical;
-      const truncated = truncateUtf8(text, byteOffset - entry.payloadStart);
-      if (truncated.length > 0) {
-        parts.push(part.type === 'text' ? { type: 'text', text: truncated } : { type: 'json', canonical: truncated });
-      }
-      break;
-    }
-
-    if (parts.length > 0) out.push({ ...block, parts });
-    break;
-  }
-
-  return out;
-}
-
-/** Cuts a string to at most `bytes` utf-8 bytes without splitting a character. */
-export function truncateUtf8(text: string, bytes: number): string {
-  if (bytes <= 0) return '';
-  const buffer = Buffer.from(text, 'utf8');
-  if (bytes >= buffer.length) return text;
-
-  let end = bytes;
-  // Step back off a continuation byte so a multibyte character is never halved.
-  while (end > 0 && ((buffer[end] ?? 0) & 0xc0) === 0x80) end -= 1;
-  return buffer.subarray(0, end).toString('utf8');
-}
 
 /**
  * Stable JSON with recursively sorted keys.
