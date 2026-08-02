@@ -11,11 +11,33 @@ about it.
 It runs locally. Nothing leaves your machine, there is no account, and the check
 path makes no network calls.
 
+Status: early. Anthropic and OpenAI are covered, plus a generic OpenAI compatible
+endpoint. Most provider facts, including the model minimums, are drawn from
+documentation and marked unverified until a conformance run measures them against
+the live API. Every number the tool prints carries its confidence, so you always
+know what is measured and what is a guess.
+
 ## Install
 
+Not yet published to npm, so run it straight from this repository. It builds on
+install, so no separate build step is needed:
+
 ```bash
-npx groundhog doctor request.json --model claude-sonnet-4-5
+npx github:swarina/groundhog doctor request.json --model claude-sonnet-4-5
 ```
+
+Or from a clone, which is also the way to use it as a library:
+
+```bash
+git clone https://github.com/swarina/groundhog
+cd groundhog
+npm install
+node dist/cli/index.js doctor request.json --model claude-sonnet-4-5
+```
+
+The examples below write `groundhog` for the command. Read that as
+`npx github:swarina/groundhog`, or link the clone with `npm link` to get a real
+`groundhog` on your path.
 
 ## Five minutes to an answer
 
@@ -27,6 +49,7 @@ provider hashes what arrived. So the accurate place to measure is the wire.
 Record what your existing tests already send:
 
 ```ts
+// install first: npm install github:swarina/groundhog
 import { capture } from 'groundhog/capture';
 
 const recorder = capture();
@@ -47,7 +70,7 @@ check that inspected no requests has not verified anything.
 If you already have a request body saved, skip the recorder:
 
 ```bash
-npx groundhog doctor request.json --model gpt-4o
+groundhog doctor request.json --model gpt-4o
 ```
 
 ## What it tells you
@@ -55,8 +78,8 @@ npx groundhog doctor request.json --model gpt-4o
 ```
 anthropic / claude-opus-5
 measured at   builder output, before any sdk normalisation
-span          338 tokens (estimate, plus or minus 12%)
-prompt        343 tokens (estimate, plus or minus 12%)
+span          287 tokens (estimate, plus or minus 12%)
+prompt        291 tokens (estimate, plus or minus 12.1%)
 minimum       4,096 tokens for this model (inferred, unverified)
 boundary      declared boundary at block 0 of 2
 
@@ -64,13 +87,13 @@ FAIL  GH102  cacheable span is below the minimum for this model, so nothing is
              cached
       confidence: certain
 
-  The span is 338 tokens, at most 379 allowing for estimation error. This model
+  The span is 287 tokens, at most 322 allowing for estimation error. This model
   requires 4,096. Nothing in this request is being cached.
 
   The API does not report an error when a span falls below the minimum. The
   request succeeds and every token is billed in full.
 
-  Fix: Add about 3,758 more tokens of stable content above the boundary, or use
+  Fix: Add about 3,809 more tokens of stable content above the boundary, or use
   a model with a lower minimum. Content only counts toward the minimum if it is
   identical on every request.
 ```
@@ -105,7 +128,7 @@ decides whether the cache pays across real traffic:
 [docs/failure-modes.md](docs/failure-modes.md) catalogues every failure mode the
 tool detects, with the cause and the fix for each.
 
-## The four commands
+## The core checks
 
 ```
 groundhog doctor request.json --model claude-sonnet-4-5   one request, does it qualify
@@ -218,7 +241,7 @@ name lives in `data/providers.json` with a confidence level, a source and a
 verification date. When a fact is unknown the check that needs it is skipped and
 named, never run against a value borrowed from a similar provider. Values marked
 `reported` came from documentation and are not yet verified; the conformance
-suite below turns them into `observed`.
+suite above turns them into `observed`.
 
 **It will not go on the hot path.** There is no proxy and no gateway. The
 recorder patches fetch inside your test process and nowhere else.
