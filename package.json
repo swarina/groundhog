@@ -4,6 +4,19 @@
   "description": "Local-first prompt cache checker. Finds out why your prompt cache is not paying.",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "prompt-caching",
+    "llm",
+    "anthropic",
+    "openai",
+    "cache",
+    "cost",
+    "determinism"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swarina/groundhog.git"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -25,13 +38,15 @@
   "files": [
     "dist",
     "data",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test",
     "doctor": "node --experimental-strip-types src/cli/index.ts"
   },
   "devDependencies": {
