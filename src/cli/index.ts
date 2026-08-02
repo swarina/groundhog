@@ -129,20 +129,33 @@ interface LoadedRequest {
   wireBytes?: number;
 }
 
+/** Parses json with a message that says where and what, not a raw parser dump. */
+function parseJson(text: string, where: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new UsageError(
+      `${where} is not valid json: ${(error as Error).message}.\n` +
+        'Expected a json request body, a json array of them, or an ndjson log with one json record per line.',
+    );
+  }
+}
+
 function readRequests(path: string): LoadedRequest[] {
   const raw = readFileSync(path, 'utf8');
 
-  if (extname(path) === '.ndjson' || raw.trimStart().startsWith('{\n') === false && raw.includes('\n{')) {
+  if (extname(path) === '.ndjson' || (raw.trimStart().startsWith('{\n') === false && raw.includes('\n{'))) {
     const out: LoadedRequest[] = [];
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
+    const lines = raw.split('\n');
+    for (let i = 0; i < lines.length; i += 1) {
+      const trimmed = (lines[i] as string).trim();
       if (!trimmed) continue;
-      out.push(normaliseRecord(JSON.parse(trimmed)));
+      out.push(normaliseRecord(parseJson(trimmed, `${path} line ${i + 1}`)));
     }
     if (out.length > 0) return out;
   }
 
-  const parsed: unknown = JSON.parse(raw);
+  const parsed: unknown = parseJson(raw, path);
   if (Array.isArray(parsed)) return parsed.map(normaliseRecord);
   return [normaliseRecord(parsed)];
 }
