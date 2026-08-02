@@ -91,7 +91,7 @@
       },
       "tokenizer": {
         "kind": "estimate",
-        "id": "mixture-heuristic-v1",
+        "id": "mixture-heuristic-v2",
         "errorBandPct": 12
       },
       "models": {
@@ -342,8 +342,9 @@
       },
       "tokenizer": {
         "kind": "estimate",
-        "id": "mixture-heuristic-v1",
-        "errorBandPct": 10
+        "id": "mixture-heuristic-v2",
+        "errorBandPct": 12,
+        "note": "Calibrated against the o200k_base tokenizer over calibration/corpus. Measured ninetieth percentile error 9.5 percent; band set to 12 for margin on unseen text."
       },
       "models": {
         "gpt-4o": {
@@ -445,7 +446,7 @@
       },
       "tokenizer": {
         "kind": "estimate",
-        "id": "mixture-heuristic-v1",
+        "id": "mixture-heuristic-v2",
         "errorBandPct": 18
       },
       "models": {}

@@ -1,10 +1,10 @@
 anthropic / claude-sonnet-4-5
 measured at   builder output, before any sdk normalisation
-span          2,354 tokens (estimate, plus or minus 12%)
-prompt        2,359 tokens (estimate, plus or minus 12%)
+span          2,003 tokens (estimate, plus or minus 12%)
+prompt        2,007 tokens (estimate, plus or minus 12%)
 minimum       1,024 tokens for this model (reported, unverified)
 boundary      declared boundary at block 0 of 2
-cached        2,354 tokens billed at the cached rate
+cached        2,003 tokens billed at the cached rate
 
 ok  no problems found, and 1 check could not run
 checks skipped

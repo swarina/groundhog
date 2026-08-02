@@ -1,7 +1,7 @@
 anthropic / claude-opus-5
 measured at   builder output, before any sdk normalisation
 span          none declared, so nothing is cacheable
-prompt        5,891 tokens (estimate, plus or minus 12%)
+prompt        5,012 tokens (estimate, plus or minus 12%)
 minimum       4,096 tokens for this model (inferred, unverified)
 boundary      no cache boundary declared, so nothing in this request is
               cacheable
@@ -10,13 +10,13 @@ FAIL  GH101  no cache boundary is declared, so nothing is being cached
       confidence: certain
 
   Anthropic caches only what a request explicitly marks. This request marks
-  nothing, so all 5,891 tokens of prompt are billed at the full input rate on
+  nothing, so all 5,012 tokens of prompt are billed at the full input rate on
   every call.
 
   The API does not report an error for this. Requests succeed and responses are
   normal.
 
-  5,886 of those tokens sit before the final turn and are the part worth
+  5,008 of those tokens sit before the final turn and are the part worth
   caching, assuming they are identical between requests, which a single request
   cannot show.
 
@@ -25,7 +25,7 @@ FAIL  GH101  no cache boundary is declared, so nothing is being cached
   after it is not, so the mark belongs after your tool definitions and system
   prompt and before the per request content.
 
-  Cost: 5,886 tokens are billed at the full input rate on every request. Price
+  Cost: 5,008 tokens are billed at the full input rate on every request. Price
   data for this model is recorded as "unknown", so the amount is not shown.
 
 checks skipped

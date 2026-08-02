@@ -21,7 +21,7 @@ export interface TokenizerProfile {
 }
 
 export const DEFAULT_TOKENIZER: TokenizerProfile = {
-  id: 'mixture-heuristic-v1',
+  id: 'mixture-heuristic-v2',
   errorBandPct: 12,
 };
 
@@ -83,21 +83,27 @@ export function estimateText(text: string, kind: 'text' | 'json'): number {
   if (text.length === 0) return 0;
   const c = classify(text);
 
-  // CJK sits close to one token per character across the tokenizers in use.
-  const cjkTokens = c.cjk * 1.0;
+  // Coefficients fitted against the o200k_base tokenizer over the calibration
+  // corpus. See calibration/README.md. CJK runs well under one token per
+  // character on a modern tokenizer, not at one.
+  const cjkTokens = c.cjk * 0.72;
 
   // Digits group into short runs rather than tokenizing individually.
   const digitTokens = c.digits / 3;
 
-  // Newlines are usually their own token or merge with leading indentation.
-  const newlineTokens = c.newlines * 0.6;
+  // Newlines usually merge with surrounding whitespace rather than standing alone.
+  const newlineTokens = c.newlines * 0.5;
 
   const remaining = c.wordish + c.punctuation;
   let latinTokens = 0;
   if (remaining > 0) {
     const punctRatio = c.punctuation / remaining;
-    const base = kind === 'json' ? 3.2 : 4.0;
-    const effective = clamp(base - 0.9 * punctRatio * 2, 2.2, 4.4);
+    // Prose sits near 4.8 characters per token. Code is denser because its
+    // punctuation mixes with identifiers, so a punctuation penalty applies to
+    // text. Structured json punctuation merges into few tokens, so it gets no
+    // penalty and a base close to prose.
+    const effective =
+      kind === 'json' ? 4.0 : clamp(4.7 - 3.0 * punctRatio, 3.3, 4.7);
     latinTokens = remaining / effective;
   }
 
