@@ -1,0 +1,21 @@
+anthropic / claude-sonnet-4-5
+measured against the live api, 4 probes
+
+measured   works-at-all
+  does caching work here, and does our prefix match what the provider hashes
+  a repeated prefix was served from cache, so caching works and our prefix model
+  matches
+
+measured   threshold
+  what is the smallest prefix this model will cache
+  a 2048 token prefix was cached and a smaller one was not, so the minimum is at
+  or below 2048
+
+measured   whitespace
+  does a trailing space inside the cached span break the match
+  a trailing space missed, so whitespace is significant to the cache here
+
+measured   tool-order
+  does the order of tool definitions change the cache key
+  reordered tools missed, so tool order is part of the cache key and must be
+  stable
