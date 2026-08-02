@@ -46,7 +46,12 @@ export interface StabilityCheckOptions extends InspectOptions {
 
 export interface Recorder {
   requests(): CapturedRequest[];
-  /** One report per captured request. Throws when nothing was captured. */
+  /**
+   * Inspects each captured request on its own and returns one report per
+   * request, so this returns an array. The stability and chain checks below
+   * analyse the requests as a set and each return a single report. Throws when
+   * nothing was captured.
+   */
   inspect(options?: InspectOptions): Report[];
   /**
    * Compares the captured requests as a set and reports whether their cacheable

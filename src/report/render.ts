@@ -1,4 +1,4 @@
-import { formatCount, formatPercent, formatUsd, pluralise } from '../core/format.js';
+import { formatCount, formatPercent, formatTokens, formatUsd, pluralise } from '../core/format.js';
 import type { Finding, Report, TokenEstimate } from '../types.js';
 
 /**
@@ -37,7 +37,7 @@ export function renderReport(report: Report, options: RenderOptions = {}): strin
   lines.push(...label('minimum', minimumText(report), width));
   lines.push(...label('boundary', report.span.basis, width));
   if (report.span.billableCachedTokens != null && report.span.billableCachedTokens > 0) {
-    lines.push(...label('cached', `${formatCount(report.span.billableCachedTokens)} tokens billed at the cached rate`, width));
+    lines.push(...label('cached', `${formatTokens(report.span.billableCachedTokens)} billed at the cached rate`, width));
   }
   lines.push('');
 
@@ -182,15 +182,15 @@ function spanText(report: Report): string {
 }
 
 function estimateText(estimate: TokenEstimate): string {
-  if (estimate.method === 'exact') return `${formatCount(estimate.value)} tokens (exact)`;
-  return `${formatCount(estimate.value)} tokens (estimate, plus or minus ${formatPercent(estimate.bandPct)})`;
+  if (estimate.method === 'exact') return `${formatTokens(estimate.value)} (exact)`;
+  return `${formatTokens(estimate.value)} (estimate, plus or minus ${formatPercent(estimate.bandPct)})`;
 }
 
 function minimumText(report: Report): string {
   const minimum = report.span.minimum;
   if (minimum.value == null) return 'not recorded for this model, so the qualification check was skipped';
   const verified = minimum.confidence === 'documented' || minimum.confidence === 'observed';
-  return `${formatCount(minimum.value)} tokens for this model${verified ? '' : ` (${minimum.confidence}, unverified)`}`;
+  return `${formatTokens(minimum.value)} for this model${verified ? '' : ` (${minimum.confidence}, unverified)`}`;
 }
 
 /** Aligned label column, with the value hanging under itself when it wraps. */

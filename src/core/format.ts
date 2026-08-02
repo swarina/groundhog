@@ -32,3 +32,8 @@ export function formatPercent(value: number): string {
 export function pluralise(count: number, singular: string, plural?: string): string {
   return count === 1 ? singular : (plural ?? singular + 's');
 }
+
+/** A token count with the word, correctly singular at one. */
+export function formatTokens(value: number): string {
+  return `${formatCount(value)} ${pluralise(Math.round(value), 'token')}`;
+}
