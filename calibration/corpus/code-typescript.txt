@@ -1,0 +1,51 @@
+export interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+  hits: number;
+}
+
+export class TtlCache<T> {
+  private readonly store = new Map<string, CacheEntry<T>>();
+
+  constructor(private readonly ttlMs: number, private readonly now: () => number = Date.now) {}
+
+  get(key: string): T | undefined {
+    const entry = this.store.get(key);
+    if (!entry) return undefined;
+    if (this.now() >= entry.expiresAt) {
+      this.store.delete(key);
+      return undefined;
+    }
+    entry.hits += 1;
+    return entry.value;
+  }
+
+  set(key: string, value: T): void {
+    this.store.set(key, { value, expiresAt: this.now() + this.ttlMs, hits: 0 });
+  }
+
+  prune(): number {
+    const cutoff = this.now();
+    let removed = 0;
+    for (const [key, entry] of this.store) {
+      if (cutoff >= entry.expiresAt) {
+        this.store.delete(key);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  get size(): number {
+    return this.store.size;
+  }
+}
+
+function groupBy<T, K extends string>(items: readonly T[], key: (item: T) => K): Record<K, T[]> {
+  const out = {} as Record<K, T[]>;
+  for (const item of items) {
+    const k = key(item);
+    (out[k] ??= []).push(item);
+  }
+  return out;
+}

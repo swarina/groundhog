@@ -1,0 +1,43 @@
+[
+  {
+    "name": "search_orders",
+    "description": "Search a customer's orders by status, date range, or item. Returns up to fifty matching orders, most recent first, with their identifier, status, total, and line items.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "customer_id": { "type": "string", "description": "The customer identifier to search within." },
+        "status": { "type": "string", "enum": ["placed", "shipped", "delivered", "cancelled", "refunded"], "description": "Restrict to orders in this status." },
+        "since": { "type": "string", "format": "date", "description": "Only orders placed on or after this date." },
+        "until": { "type": "string", "format": "date", "description": "Only orders placed on or before this date." },
+        "contains_item": { "type": "string", "description": "Only orders that contain an item whose name matches this text." }
+      },
+      "required": ["customer_id"]
+    }
+  },
+  {
+    "name": "start_refund",
+    "description": "Begin a refund for an order or specific line items. Validates eligibility against the refund policy before creating the refund, and returns the refund identifier and the amount.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "order_id": { "type": "string", "description": "The order to refund." },
+        "line_item_ids": { "type": "array", "items": { "type": "string" }, "description": "The specific line items to refund. Omit to refund the whole order." },
+        "reason": { "type": "string", "enum": ["damaged", "wrong_item", "no_longer_wanted", "not_delivered"], "description": "The reason for the refund, which affects eligibility." },
+        "notes": { "type": "string", "description": "Free text notes attached to the refund for the record." }
+      },
+      "required": ["order_id", "reason"]
+    }
+  },
+  {
+    "name": "lookup_shipment",
+    "description": "Look up the shipment for an order and return its carrier, tracking number, current status, and the latest tracking events.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "order_id": { "type": "string", "description": "The order whose shipment to look up." },
+        "include_events": { "type": "boolean", "description": "Whether to include the full list of tracking events rather than only the latest." }
+      },
+      "required": ["order_id"]
+    }
+  }
+]

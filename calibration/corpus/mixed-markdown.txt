@@ -1,0 +1,32 @@
+# Knowledge base: returns and refunds
+
+## Eligibility
+
+An item can be returned within **14 days** of delivery when it is:
+
+- unworn and in its original packaging,
+- accompanied by a receipt or an order number,
+- not on the list of final sale items below.
+
+Final sale items cannot be returned:
+
+1. gift cards and store credit,
+2. personalised or engraved products,
+3. opened grooming and personal care items.
+
+## How a refund is issued
+
+Once a return is received and inspected, the refund is issued to the original
+payment method. Card refunds take 5 to 10 business days to appear, depending on
+the bank. Store credit is issued instantly and does not expire.
+
+| Reason         | Return shipping | Restocking fee |
+| -------------- | --------------- | -------------- |
+| Damaged item   | free            | none           |
+| Wrong item     | free            | none           |
+| No longer want | customer pays   | 10 percent     |
+
+> Note: a damaged or wrong item is always replaced or refunded at no cost to the
+> customer. Ask for the order number and a short description, then file the report.
+
+See also: `shipping-policy.md`, `warranty.md`.
