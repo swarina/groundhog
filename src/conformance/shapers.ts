@@ -1,4 +1,4 @@
-import type { RequestShaper } from './probes.js';
+import { fillerForTokens, type RequestShaper } from './probes.js';
 
 /**
  * Provider specific request shapes for the probes.
@@ -9,8 +9,13 @@ import type { RequestShaper } from './probes.js';
  * probe logic does not.
  */
 
+// Tool definitions have to clear the model minimum to be cacheable at all, or
+// the tool order probe can never read a result. Each carries a large, fixed
+// description so a short tool list is well above any provider's threshold.
+const TOOL_DESCRIPTION = fillerForTokens(1600);
+
 function tool(name: string): unknown {
-  return { name, description: `the ${name} does a thing`, input_schema: { type: 'object', properties: {} } };
+  return { name, description: `The ${name}. ${TOOL_DESCRIPTION}`, input_schema: { type: 'object', properties: {} } };
 }
 
 export function anthropicShaper(model: string): RequestShaper {
