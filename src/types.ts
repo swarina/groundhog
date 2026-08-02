@@ -285,6 +285,8 @@ export interface StabilityReport {
   certain: boolean;
   provider: ProviderId;
   model: string;
+  /** Where the compared requests were observed. 'builder' is lower fidelity. */
+  fidelity: Fidelity;
   runsCompared: number;
   axes: Array<{ label: string; description: string }>;
   shared: {
@@ -310,6 +312,8 @@ export interface ChainReport {
   certain: boolean;
   provider: ProviderId;
   model: string;
+  /** Where the compared turns were observed. 'builder' is lower fidelity. */
+  fidelity: Fidelity;
   turns: number;
   steps: ChainStep[];
   findings: Finding[];

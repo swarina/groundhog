@@ -158,6 +158,7 @@ function summarise(result: MatrixResult, profile: ProviderProfile, model: string
     certain: !findings.some((finding) => finding.uncertain),
     provider: profile.id,
     model,
+    fidelity: result.runs[0]?.request.fidelity ?? 'builder',
     runsCompared: result.runs.length,
     axes: result.axes,
     shared: { tokens: sharedTokens, fullTokens, complete: result.shared.complete },

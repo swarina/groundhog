@@ -1,4 +1,5 @@
 anthropic / claude-sonnet-4-5
+measured at   the bytes the sdk was about to send
 compared      2 prefixes across 1 environment
 shared prefix 1,757 tokens (estimate, plus or minus 12%), where the runs stop
               agreeing

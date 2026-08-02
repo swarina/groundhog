@@ -127,6 +127,7 @@ export function checkChain(requests: CanonicalRequest[], profile: ProviderProfil
     certain: !findings.some((finding) => finding.uncertain),
     provider: profile.id,
     model,
+    fidelity: requests[0]?.fidelity ?? 'builder',
     turns: requests.length,
     steps,
     findings,

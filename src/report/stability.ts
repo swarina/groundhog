@@ -1,4 +1,4 @@
-import { formatCount, formatPercent, pluralise } from '../core/format.js';
+import { formatCount, formatPercent, formatTokens, pluralise } from '../core/format.js';
 import type { Finding, StabilityReport, TokenEstimate } from '../types.js';
 import { renderFindingBlock, wrap, type RenderOptions } from './render.js';
 
@@ -16,6 +16,7 @@ export function renderStabilityReport(report: StabilityReport, options: RenderOp
   const lines: string[] = [];
 
   lines.push(`${report.provider} / ${report.model}`);
+  lines.push(...labelled('measured at', fidelityText(report.fidelity), width));
   lines.push(...labelled('compared', `${formatCount(report.runsCompared)} prefixes across ${report.axes.length} ${pluralise(report.axes.length, 'environment')}`, width));
   lines.push(...labelled('shared prefix', sharedText(report), width));
   lines.push(...labelled('full request', estimateText(report.shared.fullTokens), width));
@@ -48,6 +49,10 @@ function footer(report: StabilityReport, width: number): string[] {
     wrapped.forEach((line, index) => lines.push((index === 0 ? '  ' : '    ') + line));
   }
 
+  if (report.fidelity === 'builder') {
+    for (const line of wrap(BUILDER_CAVEAT, width)) lines.push(line);
+  }
+
   if (report.findings.length > 0) {
     const first = report.findings[0] as Finding;
     for (const line of wrap(`Run "groundhog explain ${first.code}" for the full write-up.`, width)) lines.push(line);
@@ -56,14 +61,23 @@ function footer(report: StabilityReport, width: number): string[] {
   return lines;
 }
 
+const BUILDER_CAVEAT =
+  'This measured the builder output, not the bytes an sdk sends. An sdk can still normalise content, add defaults, and reserialise, so capture at the wire to be sure what the provider receives.';
+
+function fidelityText(fidelity: StabilityReport['fidelity']): string {
+  return fidelity === 'wire'
+    ? 'the bytes the sdk was about to send'
+    : 'builder output, before any sdk normalisation';
+}
+
 function sharedText(report: StabilityReport): string {
   const suffix = report.shared.complete ? ', identical across every run' : ', where the runs stop agreeing';
   return `${estimateText(report.shared.tokens)}${suffix}`;
 }
 
 function estimateText(estimate: TokenEstimate): string {
-  if (estimate.method === 'exact') return `${formatCount(estimate.value)} tokens (exact)`;
-  return `${formatCount(estimate.value)} tokens (estimate, plus or minus ${formatPercent(estimate.bandPct)})`;
+  if (estimate.method === 'exact') return `${formatTokens(estimate.value)} (exact)`;
+  return `${formatTokens(estimate.value)} (estimate, plus or minus ${formatPercent(estimate.bandPct)})`;
 }
 
 /** Aligned label column, value wrapping under itself. */

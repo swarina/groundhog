@@ -115,4 +115,14 @@ describe('stability rendering', () => {
     expect(output).not.toMatch(/[─│┌┐└┘]/);
     expect(output).not.toMatch(/[–—]/);
   });
+
+  it('warns that a builder run measured builder output, not the wire', async () => {
+    // A builder based check cannot see what the sdk sends, so the output has to
+    // say so rather than implying it measured the real bytes.
+    const report = await checkStablePrefix(() => body(stable), opts);
+    expect(report.fidelity).toBe('builder');
+    const output = renderStabilityReport(report, { color: false, width: 80 });
+    expect(output).toContain('builder output');
+    expect(output).toContain('not the bytes an sdk sends');
+  });
 });

@@ -14,6 +14,7 @@ export function renderChainReport(report: ChainReport, options: RenderOptions = 
   const lines: string[] = [];
 
   lines.push(`${report.provider} / ${report.model}`);
+  lines.push(pad('measured at', report.fidelity === 'wire' ? 'the bytes the sdk was about to send' : 'builder output, before any sdk normalisation'));
   lines.push(pad('conversation', `${formatCount(report.turns)} turns, ${formatCount(report.steps.length)} ${pluralise(report.steps.length, 'step')}`));
   lines.push(pad('chain', chainMap(report)));
   lines.push('');
@@ -49,6 +50,15 @@ function footer(report: ChainReport, width: number): string[] {
     const fraction = broken.toTurnTokens > 0 ? broken.sharedTokens / broken.toTurnTokens : 0;
     for (const line of wrap(
       `At the first break, turn ${formatCount(broken.toTurn)} reused ${formatPercent(fraction * 100)} of its ${formatCount(broken.toTurnTokens)} tokens.`,
+      width,
+    )) {
+      lines.push(line);
+    }
+  }
+
+  if (report.fidelity === 'builder') {
+    for (const line of wrap(
+      'This measured the builder output, not the bytes an sdk sends. Capture at the wire to be sure what the provider receives.',
       width,
     )) {
       lines.push(line);
