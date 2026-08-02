@@ -101,7 +101,9 @@ decides whether the cache pays across real traffic:
 | GH120 | The cacheable prefix is not identical between runs, classified by cause: a timestamp, a uuid, a counter, a random value, an unstable order, or genuine content |
 | GH130 | A conversation stops reusing its prefix at a turn, because an earlier turn was re-rendered on replay |
 
-`groundhog explain GH120` prints the full write-up for any of them.
+`groundhog explain GH120` prints the full write-up for any of them, and
+[docs/failure-modes.md](docs/failure-modes.md) catalogues every failure mode the
+tool detects, with the cause and the fix for each.
 
 ## The four commands
 
