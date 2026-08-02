@@ -1,0 +1,31 @@
+anthropic / claude-sonnet-4-6
+requests      36 over 12 minutes
+distinct      9 prefixes
+window        5m, 5 minutes
+
+observed      69.4% hit rate
+achievable    97.2% given this traffic and window
+recoverable   27.8%, about 0.0567 USD across this log
+
+where it goes
+   22.2%  prefix fragmentation (8 requests, 0.0454 USD)
+          prefixes that appear once and never reuse. Unify them: find the per
+          request value that makes each one unique and move it out of the cached
+          prefix.
+    2.8%  time to live expiry (1 request, 0.005670 USD)
+          requests that arrived after the cache had expired. Keep the prefix
+          warm, or use the longer time to live if the provider offers one.
+    2.8%  routing or scope (1 request, 0.005670 USD)
+          requests that should have hit but did not, so the miss is outside the
+          prefix. Set a cache routing key, and check the request is on the same
+          account and region.
+    2.8%  necessary cold writes (1 request, 0.005670 USD)
+          the first request for each reused prefix. This cannot be recovered, it
+          is the price of filling the cache.
+
+busiest prefixes
+   77.8%  stable (28 requests, reused)
+    2.8%  fragment-0 (1 request, seen once)
+    2.8%  fragment-1 (1 request, seen once)
+    2.8%  fragment-2 (1 request, seen once)
+    2.8%  fragment-3 (1 request, seen once)
