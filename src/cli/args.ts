@@ -12,7 +12,7 @@ export class UsageError extends Error {
 }
 
 const VALUE_FLAGS = new Set(['model', 'provider', 'width', 'provider-table', 'name', 'lockfile']);
-const BOOLEAN_FLAGS = new Set(['json', 'color', 'no-color', 'strict', 'help', 'version', 'check', 'update', 'yes']);
+const BOOLEAN_FLAGS = new Set(['json', 'color', 'no-color', 'strict', 'help', 'version', 'check', 'update', 'yes', 'ttl']);
 
 /**
  * Small hand written parser.

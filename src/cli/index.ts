@@ -500,6 +500,9 @@ async function runConformance(parsed: ParsedArgs): Promise<number> {
       'conformance measures a provider against its live api, so a table value can be "observed" rather than "reported".\n\n' +
         'usage\n' +
         '  groundhog conformance run --provider anthropic --model claude-sonnet-4-5 --yes\n\n' +
+        'It measures the minimum cacheable length, the cache step, and whether whitespace, tool order,\n' +
+        'or unicode form change the cache key. Add --ttl to also measure the time to live, which waits\n' +
+        'several real minutes.\n\n' +
         'It needs an api key in GROUNDHOG_API_KEY and it sends real, billable requests, so it will not run\n' +
         'without --yes. Without --yes it prints the plan and sends nothing.\n',
     );
@@ -515,7 +518,7 @@ async function runConformance(parsed: ParsedArgs): Promise<number> {
 
   const loaded = loadTable(stringFlag(parsed.flags, 'provider-table') ? { table: stringFlag(parsed.flags, 'provider-table') } : {});
   const profile = resolveProfile(loaded, provider, model);
-  const probes = buildProbes(shaperFor(provider, model));
+  const probes = buildProbes(shaperFor(provider, model), { includeTtl: boolFlag(parsed.flags, 'ttl') });
   const plan = planRun(probes);
 
   process.stdout.write(

@@ -223,8 +223,9 @@ groundhog conformance run --provider anthropic --model claude-sonnet-4-5   # dry
 GROUNDHOG_API_KEY=... groundhog conformance run --provider anthropic --model claude-sonnet-4-5 --yes
 ```
 
-It measures the real minimum cacheable length, whether trailing whitespace
-breaks the match, and whether tool order participates in the cache key. It is
+It measures the real minimum cacheable length, the cache step size, and whether
+trailing whitespace, tool order, or unicode form change the cache key. Add
+`--ttl` to also measure the time to live, which waits several real minutes. It is
 the only part of the tool that touches a provider, it sends real billable
 requests, and it will not run without `--yes`. The output is a
 `groundhog.providers.json` fragment of what it measured, for you to review and
