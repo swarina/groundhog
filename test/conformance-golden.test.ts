@@ -17,13 +17,17 @@ const HERE = dirname(fileURLToPath(import.meta.url));
  * that provider, so the rendered output is too, and a change to the format shows
  * up as a diff to review. No real api and no wall clock are involved.
  */
-function simulatedProvider(thresholdTokens: number): Sender {
+/** A provider with a 1024 token floor and a 128 token step, so every probe reads a result. */
+function simulatedProvider(floor: number, step: number): Sender {
   const seen = new Set<string>();
   return async (body: unknown) => {
     const { prefixHash, tokens } = computePrefix(body, { discover: false });
     const isRepeat = seen.has(prefixHash);
     seen.add(prefixHash);
-    if (isRepeat && tokens >= thresholdTokens) return { usage: { cacheRead: tokens, cacheWrite: 0, uncached: 0 } };
+    if (isRepeat && tokens >= floor) {
+      const cached = floor + Math.floor((tokens - floor) / step) * step;
+      return { usage: { cacheRead: cached, cacheWrite: 0, uncached: tokens - cached } };
+    }
     return { usage: { cacheRead: 0, cacheWrite: tokens, uncached: 0 } };
   };
 }
@@ -31,7 +35,7 @@ function simulatedProvider(thresholdTokens: number): Sender {
 describe('conformance output', () => {
   let output = '';
   beforeAll(async () => {
-    const runs: ProbeRun[] = await runProbes(buildProbes(anthropicShaper('claude-sonnet-4-5')), simulatedProvider(1500), {
+    const runs: ProbeRun[] = await runProbes(buildProbes(anthropicShaper('claude-sonnet-4-5')), simulatedProvider(1024, 128), {
       sleep: async () => undefined,
     });
     output = renderConformance(runs, 'anthropic', 'claude-sonnet-4-5', { color: false, width: 80 });

@@ -1,5 +1,5 @@
 anthropic / claude-sonnet-4-5
-measured against the live api, 4 probes
+measured against the live api, 6 probes
 
 measured   works-at-all
   does caching work here, and does our prefix match what the provider hashes
@@ -8,8 +8,8 @@ measured   works-at-all
 
 measured   threshold
   what is the smallest prefix this model will cache
-  a 2048 token prefix was cached and a smaller one was not, so the minimum is at
-  or below 2048
+  a 1024 token prefix was cached and a smaller one was not, so the minimum is at
+  or below 1024
 
 measured   whitespace
   does a trailing space inside the cached span break the match
@@ -19,3 +19,13 @@ measured   tool-order
   does the order of tool definitions change the cache key
   reordered tools missed, so tool order is part of the cache key and must be
   stable
+
+measured   unicode
+  does the provider normalise unicode before it hashes the prompt
+  the decomposed form missed, so unicode is not normalised and equivalent text
+  must be produced in the same normal form
+
+measured   granularity
+  does the provider cache in fixed steps, and how large is the step
+  cached counts landed on multiples of 128 tokens, so the cache rounds down to a
+  128 token step
