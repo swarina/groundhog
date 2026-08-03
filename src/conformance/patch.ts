@@ -24,7 +24,13 @@ interface Fact {
 }
 
 /** Facts that map to a real table field. Others are diagnostic only. */
-const PATCHABLE = new Set(['model.minCacheableTokens', 'caching.whitespaceSensitive', 'caching.toolOrderSensitive', 'caching.cacheGranularityTokens']);
+const PATCHABLE = new Set([
+  'model.minCacheableTokens',
+  'caching.whitespaceSensitive',
+  'caching.toolOrderSensitive',
+  'caching.cacheGranularityTokens',
+  'caching.unicodeNormalised',
+]);
 
 export function buildPatch(runs: ProbeRun[], options: PatchOptions): Record<string, unknown> {
   const source = `conformance run ${options.date}`;
