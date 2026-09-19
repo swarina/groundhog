@@ -2,6 +2,10 @@
 
 Find out why your prompt cache is not paying.
 
+[![ci](https://github.com/swarina/groundhog/actions/workflows/ci.yml/badge.svg)](https://github.com/swarina/groundhog/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![node: 20+](https://img.shields.io/badge/node-20+-blue.svg)
+
 Every major provider discounts a repeated prompt prefix heavily. The discount
 applies only when the prefix is identical to the last one, and when it is not,
 nothing happens: no error, no warning, a normal response, full price. Groundhog
@@ -17,7 +21,26 @@ documentation and marked unverified until a conformance run measures them agains
 the live API. Every number the tool prints carries its confidence, so you always
 know what is measured and what is a guess.
 
+## Contents
+
+- [Install](#install)
+- [Five minutes to an answer](#five-minutes-to-an-answer)
+- [What it tells you](#what-it-tells-you)
+- [How it works](#how-it-works)
+- [What it checks today](#what-it-checks-today)
+- [The core checks](#the-core-checks)
+- [The audit](#the-audit)
+- [Catching the deploy that cold starts the cache](#catching-the-deploy-that-cold-starts-the-cache)
+- [Measuring a provider instead of trusting its docs](#measuring-a-provider-instead-of-trusting-its-docs)
+- [Three things it will not do](#three-things-it-will-not-do)
+- [Correcting the provider data](#correcting-the-provider-data)
+- [Command reference](#command-reference)
+- [Development](#development)
+
 ## Install
+
+Requires Node 20 or newer.
+
 
 Not yet published to npm, so run it straight from this repository. It builds on
 install, so no separate build step is needed:
@@ -101,6 +124,42 @@ FAIL  GH102  cacheable span is below the minimum for this model, so nothing is
 Every finding says what happened, where, why it matters, and what to do. Cost
 appears as the unit that makes a finding legible, per request, never as a
 dashboard.
+
+## How it works
+
+A request enters from one of three places: captured at the wire in a test, built
+by a function the check calls, or read from a saved file or log. A provider
+adapter parses it into one canonical form, a list of ordered blocks and parts.
+The core hashes that form, locates the first byte where two prefixes diverge, and
+measures the shared span. The classifier decides whether the span qualifies to be
+cached and whether it stays identical, and names the cause when it does not. The
+report only renders.
+
+```mermaid
+flowchart TB
+  cap[Capture at the wire]
+  build[Builder function]
+  file[Saved request or NDJSON log]
+
+  cap --> adapt
+  build --> adapt
+  file --> adapt
+
+  adapt[Provider adapter parses the body] --> ir[Canonical prefix, ordered blocks and parts]
+  ir --> core[Core hashing, spans, first divergence, diff]
+  core --> classify[Classify, does it qualify and is it stable]
+  classify --> report[Report renders, decides nothing]
+  report --> out[Finding names a cause and a fix]
+
+  table[(providers.json, facts with confidence and a date)] -. profile as a value .-> core
+  table -. profile as a value .-> classify
+```
+
+The provider facts flow in as a resolved value, never as an import. The core and
+the classifier never learn a provider name, which is enforced by a test, so
+adding a provider is a row in `data/providers.json` and a small adapter, not a
+refactor. That same rule is why an unknown fact makes a check skip and say so,
+rather than run against a guess.
 
 ## What it checks today
 
@@ -235,7 +294,8 @@ keep.
 
 **It will not report a pass it cannot support.** Token counts are estimates with
 an error band. When the band crosses a threshold the answer is "no verdict", not
-"looks fine". A wrong pass here is worse than no tool.
+"looks fine". A wrong pass here is worse than no tool. The band is measured, not
+asserted: see [calibration/README.md](calibration/README.md) for how.
 
 **It will not guess a provider fact.** Every threshold, limit, price and field
 name lives in `data/providers.json` with a confidence level, a source and a
@@ -273,7 +333,7 @@ correction to one number leaves everything else alone. `groundhog providers show
 anthropic claude-opus-5` prints the merged result and where each value came
 from.
 
-## Commands
+## Command reference
 
 ```
 groundhog doctor [file]        one request, does it qualify to be cached
@@ -282,6 +342,7 @@ groundhog chain [file]         a conversation, does each turn reuse the prefix
 groundhog audit <log>          real traffic, how far below the ceiling and why
 groundhog baseline <file>      record or check the prefix hash against a lockfile
 groundhog blame                show which commit changed the cached prefix
+groundhog conformance run      measure a provider against its live API
 groundhog providers list       list providers in the data table
 groundhog providers show <id> [model]
 groundhog explain <code>       full write-up for a finding code
